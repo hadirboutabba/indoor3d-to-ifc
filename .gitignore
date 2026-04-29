@@ -161,8 +161,16 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Output files
+# Output files (*.lock already above via poetry; *.txt covers layout outputs)
 *.lock
 *.txt
 *.rrd
 *.ply
+
+# SpatialLM / pipeline outputs
+*.ifc
+output/
+pcd/
+scans/
+checkpoints/
+wandb/

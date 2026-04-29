@@ -62,6 +62,7 @@ def generate_layout(
     max_new_tokens=4096,
     detect_type="all",
     categories=[],
+    repetition_penalty=1.1,
 ):
     if seed >= 0:
         set_seed(seed)
@@ -95,8 +96,11 @@ def generate_layout(
         tokenizer, timeout=20.0, skip_prompt=True, skip_special_tokens=True
     )
 
+    attention_mask = torch.ones_like(input_ids)
+
     generate_kwargs = dict(
         {"input_ids": input_ids, "point_clouds": point_cloud},
+        attention_mask=attention_mask,
         streamer=streamer,
         max_new_tokens=max_new_tokens,
         do_sample=True,
@@ -105,6 +109,7 @@ def generate_layout(
         top_p=top_p,
         top_k=top_k,
         num_beams=num_beams,
+        repetition_penalty=repetition_penalty,
     )
     t = Thread(target=model.generate, kwargs=generate_kwargs)
     t.start()
@@ -253,6 +258,12 @@ if __name__ == "__main__":
         help="The number of beams for beam search",
     )
     parser.add_argument(
+        "--repetition_penalty",
+        type=float,
+        default=1.1,
+        help="Penalty for repeating tokens; >1.0 discourages repetition (1.0 = disabled)",
+    )
+    parser.add_argument(
         "--inference_dtype",
         type=str,
         default="bfloat16",
@@ -317,6 +328,7 @@ if __name__ == "__main__":
             seed=args.seed,
             detect_type=args.detect_type,
             categories=args.category,
+            repetition_penalty=args.repetition_penalty,
         )
         layout.translate(min_extent)
         pred_language_string = layout.to_language_string()

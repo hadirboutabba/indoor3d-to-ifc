@@ -1,293 +1,239 @@
-# SpatialLM
+# Indoor3D-to-IFC
 
-<!-- markdownlint-disable first-line-h1 -->
-<!-- markdownlint-disable html -->
-<!-- markdownlint-disable no-duplicate-header -->
+A pipeline for converting 3D point cloud scans of residential buildings into structured **IFC (Industry Foundation Classes)** BIM models, using [SpatialLM](https://github.com/manycore-research/SpatialLM) as the scene-understanding backbone.
 
-<div align="center">
-  <img src="figures/logo_light.png#gh-light-mode-only" width="60%" alt="SpatialLM" />
-  <img src="figures/logo_dark.png#gh-dark-mode-only" width="60%" alt="SpatialLM" />
-</div>
-<hr style="margin-top: 0; margin-bottom: 8px;">
-<div align="center" style="margin-top: 0; padding-top: 0; line-height: 1;">
-    <a href="https://manycore-research.github.io/SpatialLM" target="_blank" style="margin: 2px;"><img alt="Project"
-    src="https://img.shields.io/badge/🌐%20Website-SpatialLM-ffc107?color=42a5f5&logoColor=white" style="display: inline-block; vertical-align: middle;"/></a>
-    <a href="https://arxiv.org/abs/2506.07491" target="_blank" style="margin: 2px;"><img alt="arXiv"
-    src="https://img.shields.io/badge/arXiv-Techreport-b31b1b?logo=arxiv&logoColor=white" style="display: inline-block; vertical-align: middle;"/></a>
-    <a href="https://github.com/manycore-research/SpatialLM" target="_blank" style="margin: 2px;"><img alt="GitHub"
-    src="https://img.shields.io/badge/GitHub-SpatialLM-24292e?logo=github&logoColor=white" style="display: inline-block; vertical-align: middle;"/></a>
-</div>
-<div align="center" style="line-height: 1;">
-    <a href="https://huggingface.co/manycore-research/SpatialLM1.1-Qwen-0.5B" target="_blank" style="margin: 2px;"><img alt="Hugging Face"
-    src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-SpatialLM-ffc107?color=ffc107&logoColor=white" style="display: inline-block; vertical-align: middle;"/></a>
-    <a href="https://huggingface.co/datasets/manycore-research/SpatialLM-Dataset" target="_blank" style="margin: 2px;"><img alt="Dataset"
-    src="https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-Dataset-ffc107?color=ffc107&logoColor=white" style="display: inline-block; vertical-align: middle;"/></a>
-    <a href="https://huggingface.co/datasets/manycore-research/SpatialLM-Testset" target="_blank" style="margin: 2px;"><img alt="Dataset"
-    src="https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-Testset-ffc107?color=ffc107&logoColor=white" style="display: inline-block; vertical-align: middle;"/></a>
-</div>
+---
 
-## ✨ News
+## Overview
 
-- [Sept, 2025] [SpatialLM-Dataset](https://huggingface.co/datasets/manycore-research/SpatialLM-Dataset) is now available on Hugging Face.
-- [Sept, 2025] SpatialLM accepted at NeurIPS 2025.
-- [Jun, 2025] Added finetuning instructions in [FINETUNE.md](./FINETUNE.md).
-- [Jun, 2025] Check out our new models: [SpatialLM1.1-Llama-1B](https://huggingface.co/manycore-research/SpatialLM1.1-Llama-1B) and [SpatialLM1.1-Qwen-0.5B](https://huggingface.co/manycore-research/SpatialLM1.1-Qwen-0.5B), now available on Hugging Face. SpatialLM1.1 doubles the point cloud resolution, incorporates a more powerful point cloud encoder [Sonata](https://xywu.me/sonata/) and supports detection with user-specified categories.
-- [Jun, 2025] SpatialLM [Technical Report](https://arxiv.org/abs/2506.07491) is now on arXiv.
-- [Mar, 2025] We're excited to release the [SpatialLM-Llama-1B](https://huggingface.co/manycore-research/SpatialLM-Llama-1B) and [SpatialLM-Qwen-0.5B](https://huggingface.co/manycore-research/SpatialLM-Qwen-0.5B) on Hugging Face.
-- [Mar, 2025] Initial release of SpatialLM!
+This project automates the journey from a raw 3D scan of a residential interior to a standards-compliant IFC building model:
 
-## Introduction
+```
+Slamtec Aurora S (or any scanner)
+        │
+        ▼ PLY point cloud
+  ┌─────────────┐
+  │  SpatialLM  │  ← detects walls, doors, windows, furniture (oriented bounding boxes)
+  └─────────────┘
+        │
+        ▼ structured layout (.txt)
+  ┌─────────────┐
+  │ IFC Builder │  ← converts spatial entities to IFC elements (IfcWall, IfcDoor, …)
+  └─────────────┘
+        │
+        ▼ .ifc model
+  Any BIM / CAD tool (Revit, ArchiCAD, BlenderBIM, …)
+```
 
-SpatialLM is a 3D large language model designed to process 3D point cloud data and generate structured 3D scene understanding outputs. These outputs include architectural elements like walls, doors, windows, and oriented object bounding boxes with their semantic categories. Unlike previous methods that require specialized equipment for data collection, SpatialLM can handle point clouds from diverse sources such as monocular video sequences, RGBD images, and LiDAR sensors. This multimodal architecture effectively bridges the gap between unstructured 3D geometric data and structured 3D representations, offering high-level semantic understanding. It enhances spatial reasoning capabilities for applications in embodied robotics, autonomous navigation, and other complex 3D scene analysis tasks.
+**Supported input sources**
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/c0218d6a-f676-41f8-ae76-bba228866306" poster="figures/cover.png"> </video>
-  <p><i>SpatialLM reconstructs 3D layout from a monocular RGB video with MASt3R-SLAM. Results aligned to video with GT cameras for visualization.</i></p>
-</div>
+| Scanner | Output format | Notes |
+|---|---|---|
+| Slamtec Aurora S | `.ply` | Primary target — exports axis-aligned point clouds |
+| Any LiDAR sensor | `.ply` | Z-axis must be the up axis |
+| Monocular video + MASt3R-SLAM | `.ply` | Works well for quick surveys |
+| RGBD cameras | `.ply` | After point cloud reconstruction |
 
-## SpatialLM Models
+**What SpatialLM detects**
 
-<div align="center">
+| Entity | IFC equivalent |
+|---|---|
+| Wall segment (start/end/height/thickness) | `IfcWall` |
+| Door (wall reference, position, size) | `IfcDoor` |
+| Window (wall reference, position, size) | `IfcWindow` |
+| Oriented bounding box (59 furniture categories) | `IfcFurnishingElement` |
 
-|       **Model**        | **Download**                                                                      |
-| :--------------------: | --------------------------------------------------------------------------------- |
-| SpatialLM1.1-Llama-1B  | [🤗 HuggingFace](https://huggingface.co/manycore-research/SpatialLM1.1-Llama-1B)  |
-| SpatialLM1.1-Qwen-0.5B | [🤗 HuggingFace](https://huggingface.co/manycore-research/SpatialLM1.1-Qwen-0.5B) |
-| SpatialLM1.0-Llama-1B  | [🤗 HuggingFace](https://huggingface.co/manycore-research/SpatialLM-Llama-1B)     |
-| SpatialLM1.0-Qwen-0.5B | [🤗 HuggingFace](https://huggingface.co/manycore-research/SpatialLM-Qwen-0.5B)    |
+---
 
-</div>
+## Models
+
+SpatialLM weights used by this project:
+
+| Model | Size | Link |
+|---|---|---|
+| SpatialLM1.1-Qwen-0.5B | 0.5B | [HuggingFace](https://huggingface.co/manycore-research/SpatialLM1.1-Qwen-0.5B) |
+| SpatialLM1.1-Llama-1B | 1B | [HuggingFace](https://huggingface.co/manycore-research/SpatialLM1.1-Llama-1B) |
+
+---
+
+## Installation
+
+**Requirements:** Python 3.11 · PyTorch 2.4.1 · CUDA 12.4
+
+```bash
+git clone https://github.com/YOUR_USERNAME/indoor3d-to-ifc.git
+cd indoor3d-to-ifc
+
+conda create -n indoor3d python=3.11
+conda activate indoor3d
+conda install -y -c nvidia/label/cuda-12.4.0 cuda-toolkit conda-forge::sparsehash
+
+pip install poetry && poetry config virtualenvs.create false --local
+poetry install
+
+# Install Sonata point cloud encoder (required for SpatialLM 1.1)
+poe install-sonata
+```
+
+> **Note on Flash Attention:** If your GPU does not support Flash Attention or you encounter
+> installation issues, the encoder automatically falls back to standard attention.
+
+---
 
 ## Usage
 
-### Installation
+### Step 1 — Prepare your point cloud
 
-Tested with the following environment:
+Export your scan as a `.ply` file with the **Z-axis pointing up**. Most Slamtec Aurora S exports are already axis-aligned. If not, align them before running inference.
 
-- Python 3.11
-- Pytorch 2.4.1
-- CUDA Version 12.4
+### Step 2 — Run SpatialLM inference
 
 ```bash
-# clone the repository
-git clone https://github.com/manycore-research/SpatialLM.git
-cd SpatialLM
+# Full structured reconstruction (walls + doors + windows + furniture)
+python inference.py \
+  --point_cloud path/to/scan.ply \
+  --output path/to/output.txt \
+  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B
 
-# create a conda environment with cuda 12.4
-conda create -n spatiallm python=3.11
-conda activate spatiallm
-conda install -y -c nvidia/label/cuda-12.4.0 cuda-toolkit conda-forge::sparsehash
+# Layout only (walls, doors, windows — no furniture)
+python inference.py \
+  --point_cloud path/to/scan.ply \
+  --output path/to/output.txt \
+  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B \
+  --detect_type arch
 
-# Install dependencies with poetry
-pip install poetry && poetry config virtualenvs.create false --local
-poetry install
-# SpatialLM1.0 dependency
-poe install-torchsparse # Building wheel for torchsparse will take a while
-# SpatialLM1.1 dependency
-poe install-sonata # Building wheel for flash-attn will take a while
+# Specific furniture categories only
+python inference.py \
+  --point_cloud path/to/scan.ply \
+  --output path/to/output.txt \
+  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B \
+  --detect_type object \
+  --category sofa bed dining_table
 ```
 
-### Inference
+**Key inference options**
 
-In the current version of SpatialLM, input point clouds are considered axis-aligned where the z-axis is the up axis. This orientation is crucial for maintaining consistency in spatial understanding and scene interpretation across different datasets and applications.
-Example preprocessed point clouds, reconstructed from RGB videos using [MASt3R-SLAM](https://github.com/rmurai0610/MASt3R-SLAM), are available in [SpatialLM-Testset](#spatiallm-testset).
+| Flag | Default | Description |
+|---|---|---|
+| `--detect_type` | `all` | `all` / `arch` / `object` |
+| `--category` | (all 59) | Subset of furniture categories to detect |
+| `--repetition_penalty` | `1.1` | Reduces repetitive predictions |
+| `--inference_dtype` | `bfloat16` | Use `float32` if bfloat16 is unsupported |
+| `--no_cleanup` | off | Skip point cloud denoising |
+| `--seed` | -1 | Set for reproducible results |
 
-Download an example point cloud:
+### Step 3 — Visualize (optional)
 
 ```bash
-huggingface-cli download manycore-research/SpatialLM-Testset pcd/scene0000_00.ply --repo-type dataset --local-dir .
+python visualize.py \
+  --point_cloud path/to/scan.ply \
+  --layout path/to/output.txt \
+  --save preview.rrd
+
+rerun preview.rrd
 ```
 
-Run inference:
+### Step 4 — Convert to IFC
+
+> **Work in progress.** The IFC builder module is under active development.
+> See [PIPELINE.md](./PIPELINE.md) for the planned architecture.
 
 ```bash
-python inference.py --point_cloud pcd/scene0000_00.ply --output scene0000_00.txt --model_path manycore-research/SpatialLM1.1-Qwen-0.5B
+# Coming soon
+python ifc_builder.py --layout path/to/output.txt --output model.ifc
 ```
 
-### Detection with user-specified categories
+---
 
-SpatialLM1.1 supports object detection conditioned on user-specified categories by leveraging the flexibility of LLMs.
+## Output format
 
-SpatialLM1.1 offers three variants of structured indoor modeling tasks:
+The SpatialLM layout text file uses a Python dataclass-style schema (discretized integers):
 
-- **Structured Reconstruction**: Detect walls, doors, windows, boxes.
-- **Layout Estimation**: Detect walls, doors, windows.
-- **3D Object Detection**: Detect boxes.
-
-For tasks that include object box estimation, you can specify a subset of the 59 furniture categories, and the model will only predict objects within those specified categories. For example:
-
-```bash
-python inference.py --point_cloud pcd/scene0000_00.ply --output scene0000_00.txt --model_path manycore-research/SpatialLM1.1-Qwen-0.5B --detect_type object --category bed nightstand
+```python
+wall_0 = Wall(ax=..., ay=..., az=..., bx=..., by=..., bz=..., height=..., thickness=...)
+door_0 = Door(wall_id='wall_0', position_x=..., position_y=..., position_z=..., width=..., height=...)
+window_0 = Window(wall_id='wall_0', position_x=..., position_y=..., position_z=..., width=..., height=...)
+bbox_0 = Bbox(class='sofa', position_x=..., position_y=..., position_z=..., angle_z=..., scale_x=..., scale_y=..., scale_z=...)
 ```
 
-### Visualization
+See [PIPELINE.md](./PIPELINE.md) for how these map to IFC entities.
 
-Use `rerun` to visualize the point cloud and the predicted structured 3D layout output:
+---
 
-```bash
-# Convert the predicted layout to Rerun format
-python visualize.py --point_cloud pcd/scene0000_00.ply --layout scene0000_00.txt --save scene0000_00.rrd
+## Development environment
 
-# Visualize the point cloud and the predicted layout
-rerun scene0000_00.rrd
+The pipeline is currently developed and tested on the following setup:
+
+**Host machine**
+
+| Component | Details |
+|---|---|
+| OS | Windows 11 + WSL2 (kernel 6.6.87.2-microsoft-standard-WSL2) |
+| CPU | Intel Core i7-10875H @ 2.30 GHz (8 cores) |
+| RAM | 16 GB |
+| GPU | NVIDIA GeForce RTX 2070 Super (8 GB VRAM, compute capability 7.5) |
+| GPU driver | 581.95 |
+
+**Software environment (inside WSL2)**
+
+| Component | Version |
+|---|---|
+| Python | 3.11.15 |
+| PyTorch | 2.4.1+cu124 |
+| CUDA toolkit | 12.4 |
+| Conda environment | `indoor3d` |
+
+**Hardware notes**
+
+- The RTX 2070 Super (Turing, CC 7.5) does **not** support Flash Attention, which requires Ampere (CC 8.0+) or newer. Flash Attention is therefore disabled in `spatiallm/model/sonata_encoder.py` and standard attention is used instead.
+- The 0.5B Qwen model fits comfortably in 8 GB VRAM during inference. The 1B Llama model requires approximately 6–7 GB and also runs on this card.
+- Full fine-tuning (~60 GB VRAM requirement) is not feasible on this machine. The project targets inference and lightweight adaptation only.
+
+---
+
+## Project structure
+
+```
+.
+├── inference.py              # SpatialLM inference — point cloud → layout text
+├── visualize.py              # Rerun-based 3D preview
+├── eval.py                   # Benchmark evaluation
+├── train.py                  # Fine-tuning entry point
+├── code_template.txt         # Schema fed to the LLM as generation context
+├── configs/
+│   └── spatiallm_sft.yaml    # Fine-tuning config
+├── spatiallm/
+│   ├── model/                # SpatialLM model definitions (Llama / Qwen variants + Sonata encoder)
+│   ├── layout/               # Layout parsing and coordinate handling
+│   ├── pcd/                  # Point cloud loading and preprocessing
+│   └── tuner/                # Fine-tuning pipeline (data, trainer, hyperparams)
+└── PIPELINE.md               # Detailed pipeline design and IFC mapping
 ```
 
-### Evaluation
+---
 
-To evaluate the performance of SpatialLM, we provide `eval.py` script that reports the benchmark results on the SpatialLM-Testset in the table below in section [Benchmark Results](#benchmark-results).
+## Roadmap
 
-Download the testset:
+- [x] SpatialLM inference on PLY point clouds
+- [x] Repetition penalty + attention mask fixes for stable generation
+- [ ] IFC builder: Wall → `IfcWall`
+- [ ] IFC builder: Door/Window → `IfcDoor` / `IfcWindow`
+- [ ] IFC builder: Furniture OBBs → `IfcFurnishingElement`
+- [ ] Slamtec Aurora S pre-processing script (coordinate alignment)
+- [ ] Multi-room / multi-floor merge
+- [ ] Evaluation on residential scan dataset
 
-```bash
-huggingface-cli download manycore-research/SpatialLM-Testset --repo-type dataset --local-dir SpatialLM-Testset
-```
+---
 
-Run evaluation:
+## Credits
 
-```bash
-# Run inference on the PLY point clouds in folder SpatialLM-Testset/pcd with SpatialLM1.1-Qwen-0.5B model
-python inference.py --point_cloud SpatialLM-Testset/pcd --output SpatialLM-Testset/pred --model_path manycore-research/SpatialLM1.1-Qwen-0.5B
+- **SpatialLM** — [manycore-research/SpatialLM](https://github.com/manycore-research/SpatialLM) (NeurIPS 2025)
+- **Sonata encoder** — [xywu.me/sonata](https://xywu.me/sonata/)
+- **MASt3R-SLAM** — for monocular video reconstruction
 
-# Evaluate the predicted layouts
-python eval.py --metadata SpatialLM-Testset/test.csv --gt_dir SpatialLM-Testset/layout --pred_dir SpatialLM-Testset/pred --label_mapping SpatialLM-Testset/benchmark_categories.tsv
-```
-
-### Example using a custom video
-
-We provide an example of how to use our model to estimate scene layout starting from a RGB video with the newly released [SLAM3R](https://github.com/PKU-VCL-3DV/SLAM3R) in [EXAMPLE.md](EXAMPLE.md). These steps work for MASt3R-SLAM, and other reconstruction methods as well.
-
-### Finetune on Custom Data
-
-For instructions on fine-tuning SpatialLM on your own data, please refer to [FINETUNE.md](./FINETUNE.md). We provide an example using the [ARKitScenes](https://github.com/apple/ARKitScenes) dataset.
-
-## SpatialLM Dataset
-
-The SpatialLM dataset is a large-scale, high-quality synthetic dataset designed by professional 3D designers and used for real-world production. It contains point clouds from 12,328 diverse indoor scenes comprising 54,778 rooms, each paired with rich ground-truth 3D annotations. SpatialLM dataset provides an additional valuable resource for advancing research in indoor scene understanding, 3D perception, and related applications.
-
-For access to photorealistic RGB/Depth/Normal/Semantic/Instance panoramic renderings and camera trajectories used to generate the SpatialLM point clouds, please refer to the [SpatialGen project](https://manycore-research.github.io/SpatialGen) for more details.
-
-<div align="center">
-
-|    **Dataset**    | **Download**                                                                       |
-| :---------------: | ---------------------------------------------------------------------------------- |
-| SpatialLM-Dataset | [🤗 Datasets](https://huggingface.co/datasets/manycore-research/SpatialLM-Dataset) |
-
-</div>
-
-## SpatialLM Testset
-
-We provide a test set of 107 preprocessed point clouds, reconstructed from RGB videos using [MASt3R-SLAM](https://github.com/rmurai0610/MASt3R-SLAM). SpatialLM-Testset is quite challenging compared to prior clean RGBD scans datasets due to the noises and occlusions in the point clouds reconstructed from monocular RGB videos.
-
-<div align="center">
-
-|    **Dataset**    | **Download**                                                                       |
-| :---------------: | ---------------------------------------------------------------------------------- |
-| SpatialLM-Testset | [🤗 Datasets](https://huggingface.co/datasets/manycore-research/SpatialLM-TestSet) |
-
-</div>
-
-## Benchmark Results
-
-### Layout Estimation
-
-Layout estimation focuses on predicting architectural elements, i.e., walls, doors, and windows, within an indoor scene. We evaluated this task on the [Structured3D](https://structured3d-dataset.org) dataset. For [RoomFormer](https://github.com/ywyue/RoomFormer), we directly downloaded the model checkpoint. SceneScript and SpatialLM were first trained on our dataset, and further fine-tuned on Structured3D.
-
-We thank @chinmay0301ucsd for identifying and fixing a bug [#88](https://github.com/manycore-research/SpatialLM/pull/88) in the evaluation script that affected door and window metrics. As a result, the scores are higher than previously reported.
-
-<div align="center">
-
-|   **Method**    | **RoomFormer** | **SceneScript (finetuned)** | **SpatialLM1.1-Qwen-0.5B (finetuned)** |
-| :-------------: | :------------: | :-------------------------: | :------------------------------------: |
-| **F1 @.25 IoU** |      83.4      |            90.4             |                  94.3                  |
-| **F1 @.5 IoU**  |      81.4      |            89.2             |                  93.5                  |
-
-</div>
-
-### 3D Object Detection
-
-We evaluate 3D object detection on [ScanNet](http://www.scan-net.org) with annotations of 18 object categories. For [V-DETR](https://github.com/V-DETR/V-DETR), we directly download the model checkpoint. SceneScript and SpatialLM were first trained on our dataset, and further fine-tuned on ScanNet.
-
-<div align="center">
-
-|   **Method**    | **V-DETR** | **SceneScript (finetuned)** | **SpatialLM1.1-Qwen-0.5B (finetuned)** |
-| :-------------: | :--------: | :-------------------------: | :------------------------------------: |
-| **F1 @.25 IoU** |    65.1    |            49.1             |                  65.6                  |
-| **F1 @.5 IoU**  |    56.8    |            36.8             |                  52.6                  |
-
-</div>
-
-### Zero-shot Detection on Videos
-
-Zero-shot detection results on the challenging SpatialLM-Testset are reported in the following table:
-
-<div align="center">
-
-|   **Method**    | **SpatialLM1.1-Llama-1B** | **SpatialLM1.1-Qwen-0.5B** |
-| :-------------: | :-----------------------: | :------------------------: |
-|   **Layout**    |   **F1 @.25 IoU (2D)**    |    **F1 @.25 IoU (2D)**    |
-|      wall       |           68.9            |            68.2            |
-|      door       |           49.1            |            47.4            |
-|     window      |           47.0            |            51.4            |
-|                 |                           |                            |
-|   **Objects**   |   **F1 @.25 IoU (3D)**    |    **F1 @.25 IoU (2D)**    |
-|     curtain     |           34.9            |            37.0            |
-|   nightstand    |           62.8            |            67.0            |
-|   chandelier    |           53.5            |            36.8            |
-|    wardrobe     |           29.4            |            39.6            |
-|       bed       |           96.8            |            95.2            |
-|      sofa       |           66.9            |            69.1            |
-|      chair      |           20.8            |            32.3            |
-|     cabinet     |           15.2            |            11.2            |
-|  dining table   |           40.7            |            24.2            |
-|     plants      |           29.5            |            26.3            |
-|   tv cabinet    |           34.4            |            27.3            |
-|  coffee table   |           56.4            |            64.9            |
-|   side table    |           14.6            |            9.7             |
-| air conditioner |           16.7            |            24.0            |
-|     dresser     |           46.7            |            46.7            |
-|      stool      |           17.6            |            30.8            |
-|  refrigerator   |            0.0            |            16.7            |
-|    painting     |           34.9            |            38.2            |
-|     carpet      |           40.3            |            24.1            |
-|       tv        |           16.0            |            18.0            |
-
-</div>
-
-### Result Visualizations
-
-<div align="center">
-
-|                                                            Layout Estimation                                                            |                                                          Object Detection                                                          |                                                       Zero-shot Reconstruction                                                        |
-| :-------------------------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------------------------: |
-|                                                  ![Structured3D](./figures/stru3d.jpg)                                                  |                                                 ![ScanNet](./figures/scannet.jpg)                                                  |                                                 ![Zero-shot](./figures/zeroshot.jpg)                                                  |
-| [Structured3D Results](https://manycore-research-azure.kujiale.com/manycore-research/SpatialLM/supplementary/visualization_layout.html) | [ScanNet Results](https://manycore-research-azure.kujiale.com/manycore-research/SpatialLM/supplementary/visualization_object.html) | [Zeroshot Results](https://manycore-research-azure.kujiale.com/manycore-research/SpatialLM/supplementary/visualization_zeroshot.html) |
-
-</div>
+---
 
 ## License
 
-SpatialLM-Llama-1B is derived from Llama3.2-1B-Instruct, which is licensed under the Llama3.2 license.
-SpatialLM-Qwen-0.5B is derived from the Qwen-2.5 series, originally licensed under the Apache 2.0 License.
-
-SpatialLM1.0 are built upon the SceneScript point cloud encoder, licensed under the CC-BY-NC-4.0 License. TorchSparse, utilized in this project, is licensed under the MIT License.
-
-SpatialLM1.1 are built upon Sonata point cloud encoder, model weight is licensed under the CC-BY-NC-4.0 License. Code built on Pointcept is licensed under the Apache 2.0 License.
-
-## Citation
-
-If you find this work useful, please consider citing:
-
-```bibtex
-@inproceedings{SpatialLM,
-  title     = {SpatialLM: Training Large Language Models for Structured Indoor Modeling},
-  author    = {Mao, Yongsen and Zhong, Junhao and Fang, Chuan and Zheng, Jia and Tang, Rui and Zhu, Hao and Tan, Ping and Zhou, Zihan},
-  booktitle = {Advances in Neural Information Processing Systems},
-  year      = {2025}
-}
-```
-
-## Acknowledgements
-
-We would like to thank the following projects that made this work possible:
-
-[Llama3.2](https://github.com/meta-llama) | [Qwen2.5](https://github.com/QwenLM/Qwen2.5) | [Transformers](https://github.com/huggingface/transformers) | [SceneScript](https://github.com/facebookresearch/scenescript) | [TorchSparse](https://github.com/mit-han-lab/torchsparse) | [Sonata](https://xywu.me/sonata/) | [Pointcept](https://github.com/Pointcept/Pointcept)
+The SpatialLM model weights are subject to the [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/).
+Code in this repository is MIT licensed unless otherwise noted.
