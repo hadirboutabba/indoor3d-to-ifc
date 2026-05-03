@@ -15,8 +15,19 @@ This document describes the full pipeline from raw scanner output to IFC model, 
                      │ .ply (axis-aligned, Z up)
                      ▼
 ┌─────────────────────────────────────────────┐
-│  PREPROCESSING  (inference.py)              │
-│  • Outlier removal (cleanup_pcd)            │
+│  PREPROCESSING  (preprocess_for_spatiallm.py│
+│  • Statistical outlier removal (3 modes)    │
+│  • DBSCAN largest-cluster filtering         │
+│  • Z-up alignment via PCA                   │
+│  • Manhattan alignment (walls → X/Y axes)   │
+│  • Metric scaling (target height = 2.5 m)   │
+│  • Optional voxel downsampling              │
+│  • Optional color normalization             │
+└────────────────────┬────────────────────────┘
+                     │ clean, axis-aligned .ply
+                     ▼
+┌─────────────────────────────────────────────┐
+│  SPATIALLM INTERNAL PREP  (inference.py)    │
 │  • Voxel grid sampling (GridSample)         │
 │  • Color normalization                      │
 │  • Coord discretization to integer bins     │
@@ -42,6 +53,73 @@ This document describes the full pipeline from raw scanner output to IFC model, 
            BIM tools (Revit, ArchiCAD,
            BlenderBIM, FreeCAD…)
 ```
+
+---
+
+## Preprocessing script
+
+`preprocess_for_spatiallm.py` prepares a raw PLY point cloud for SpatialLM inference. It runs a fixed sequence of steps and writes a clean PLY file that can be fed directly to `inference.py`.
+
+### Processing steps (in order)
+
+| Step | Function | What it does |
+|---|---|---|
+| 1. Denoise | `denoise()` | Removes statistical outliers; optionally adds a radius pass |
+| 2. Cluster filter | `keep_largest_cluster()` | Discards fragments by keeping only the DBSCAN largest cluster |
+| 3. Z-up alignment | `align_z_up_pca()` | Rotates the cloud so the gravity axis is Z, using the smallest-variance PCA eigenvector |
+| 4. Manhattan alignment | `align_manhattan()` | Rotates around Z so the dominant wall direction is parallel to X/Y axes — required by SpatialLM |
+| 5. Metric scaling | `scale_to_metric()` | Rescales the cloud so the floor-to-ceiling height equals `--target_height` (default 2.5 m) |
+| 6. Voxel downsample | built-in | Optional uniform downsampling via `--voxel_size` |
+| 7. Color normalization | `normalize_colors()` | Shifts color distribution to match SpatialLM training statistics |
+
+### Denoising modes
+
+| Mode | Passes | Radius pass | Use when |
+|---|---|---|---|
+| `conservative` | 1 × (20 neighbors, σ=2.5) | No | Dense, high-quality scans; preserves fine details |
+| `moderate` (default) | 1 × (20 neighbors, σ=2.0) | No | General use |
+| `aggressive` | 2 × (20→10 neighbors, σ=2.0→1.5) + radius | Yes | Noisy / sparse scans |
+
+### Usage
+
+```bash
+# Single file, default mode
+python preprocess_for_spatiallm.py -i noisy.ply -o clean.ply
+
+# Conservative denoising
+python preprocess_for_spatiallm.py -i noisy.ply -o clean.ply --mode conservative
+
+# Batch: all .ply files in a folder
+python preprocess_for_spatiallm.py -i scans/ -o clean_scans/ --mode aggressive
+
+# Aggressive + keep largest cluster + voxel downsample + color normalization
+python preprocess_for_spatiallm.py -i noisy.ply -o clean.ply \
+    --mode aggressive \
+    --keep_largest_cluster \
+    --voxel_size 0.02 \
+    --normalize_colors
+```
+
+**All flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `-i / --input` | — | Input `.ply` file or folder of `.ply` files |
+| `-o / --output` | — | Output `.ply` file or folder |
+| `--mode` | `moderate` | Denoising preset: `conservative` / `moderate` / `aggressive` |
+| `--nb_neighbors` | — | Custom outlier filter neighbor count (pair with `--std_ratio`) |
+| `--std_ratio` | — | Custom outlier filter std multiplier |
+| `--use_radius` | off | Add a radius-based outlier pass on top of the statistical one |
+| `--radius` | `0.05` | Radius for the radius pass (metres) |
+| `--radius_min_points` | `8` | Minimum neighbors within radius |
+| `--keep_largest_cluster` | off | Run DBSCAN and drop all but the largest cluster |
+| `--dbscan_eps` | `0.05` | DBSCAN neighborhood radius |
+| `--dbscan_min_points` | `20` | DBSCAN minimum cluster size |
+| `--no_align` | off | Skip Z-up + Manhattan alignment |
+| `--no_scale` | off | Skip metric scaling |
+| `--target_height` | `2.5` | Floor-to-ceiling target height (metres) |
+| `--voxel_size` | `0.0` | Voxel size for downsampling; `0` = disabled |
+| `--normalize_colors` | off | Shift color statistics to match SpatialLM training distribution |
 
 ---
 
