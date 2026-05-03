@@ -11,7 +11,12 @@ This project automates the journey from a raw 3D scan of a residential interior 
 ```
 Slamtec Aurora S (or any scanner)
         │
-        ▼ PLY point cloud
+        ▼ raw PLY point cloud
+  ┌──────────────────┐
+  │   Preprocessor   │  ← denoise · align Z-up · align walls to X/Y · scale to metres
+  └──────────────────┘
+        │
+        ▼ clean, axis-aligned PLY
   ┌─────────────┐
   │  SpatialLM  │  ← detects walls, doors, windows, furniture (oriented bounding boxes)
   └─────────────┘
@@ -82,16 +87,44 @@ poe install-sonata
 
 ## Usage
 
-### Step 1 — Prepare your point cloud
+### Step 1 — Export your point cloud
 
-Export your scan as a `.ply` file with the **Z-axis pointing up**. Most Slamtec Aurora S exports are already axis-aligned. If not, align them before running inference.
+Export your scan as a `.ply` file. The Slamtec Aurora S exports directly to PLY; other sensors may require a reconstruction step first.
 
-### Step 2 — Run SpatialLM inference
+### Step 2 — Preprocess
+
+`preprocess_for_spatiallm.py` cleans the cloud, aligns it to a Z-up / Manhattan frame, and rescales it to metric units — all requirements for reliable SpatialLM inference.
+
+```bash
+# Single file (default: moderate denoising)
+python preprocess_for_spatiallm.py -i raw_scan.ply -o clean_scan.ply
+
+# Aggressive denoising + keep only the main structure + voxel downsample
+python preprocess_for_spatiallm.py -i raw_scan.ply -o clean_scan.ply \
+    --mode aggressive \
+    --keep_largest_cluster \
+    --voxel_size 0.02
+
+# Batch: process every .ply in a folder
+python preprocess_for_spatiallm.py -i scans/ -o clean_scans/
+```
+
+**Denoising modes**
+
+| Mode | What it does |
+|---|---|
+| `conservative` | One gentle statistical pass — preserves fine details |
+| `moderate` (default) | One standard statistical pass — good all-round choice |
+| `aggressive` | Two passes + optional radius filter — best for noisy / sparse scans |
+
+See [PIPELINE.md](./PIPELINE.md#preprocessing-script) for the full list of flags and a description of each processing step.
+
+### Step 3 — Run SpatialLM inference
 
 ```bash
 # Full structured reconstruction (walls + doors + windows + furniture)
 python inference.py \
-  --point_cloud path/to/scan.ply \
+  --point_cloud path/to/clean_scan.ply \
   --output path/to/output.txt \
   --model_path manycore-research/SpatialLM1.1-Qwen-0.5B
 
@@ -122,7 +155,7 @@ python inference.py \
 | `--no_cleanup` | off | Skip point cloud denoising |
 | `--seed` | -1 | Set for reproducible results |
 
-### Step 3 — Visualize (optional)
+### Step 4 — Visualize (optional)
 
 ```bash
 python visualize.py \
@@ -133,7 +166,7 @@ python visualize.py \
 rerun preview.rrd
 ```
 
-### Step 4 — Convert to IFC
+### Step 5 — Convert to IFC
 
 > **Work in progress.** The IFC builder module is under active development.
 > See [PIPELINE.md](./PIPELINE.md) for the planned architecture.
@@ -195,19 +228,20 @@ The pipeline is currently developed and tested on the following setup:
 
 ```
 .
-├── inference.py              # SpatialLM inference — point cloud → layout text
-├── visualize.py              # Rerun-based 3D preview
-├── eval.py                   # Benchmark evaluation
-├── train.py                  # Fine-tuning entry point
-├── code_template.txt         # Schema fed to the LLM as generation context
+├── preprocess_for_spatiallm.py  # Point cloud cleaning, alignment, and scaling
+├── inference.py                 # SpatialLM inference — point cloud → layout text
+├── visualize.py                 # Rerun-based 3D preview
+├── eval.py                      # Benchmark evaluation
+├── train.py                     # Fine-tuning entry point
+├── code_template.txt            # Schema fed to the LLM as generation context
 ├── configs/
-│   └── spatiallm_sft.yaml    # Fine-tuning config
+│   └── spatiallm_sft.yaml       # Fine-tuning config
 ├── spatiallm/
-│   ├── model/                # SpatialLM model definitions (Llama / Qwen variants + Sonata encoder)
-│   ├── layout/               # Layout parsing and coordinate handling
-│   ├── pcd/                  # Point cloud loading and preprocessing
-│   └── tuner/                # Fine-tuning pipeline (data, trainer, hyperparams)
-└── PIPELINE.md               # Detailed pipeline design and IFC mapping
+│   ├── model/                   # SpatialLM model definitions (Llama / Qwen variants + Sonata encoder)
+│   ├── layout/                  # Layout parsing and coordinate handling
+│   ├── pcd/                     # Point cloud loading and preprocessing
+│   └── tuner/                   # Fine-tuning pipeline (data, trainer, hyperparams)
+└── PIPELINE.md                  # Detailed pipeline design and IFC mapping
 ```
 
 ---
@@ -219,7 +253,7 @@ The pipeline is currently developed and tested on the following setup:
 - [ ] IFC builder: Wall → `IfcWall`
 - [ ] IFC builder: Door/Window → `IfcDoor` / `IfcWindow`
 - [ ] IFC builder: Furniture OBBs → `IfcFurnishingElement`
-- [ ] Slamtec Aurora S pre-processing script (coordinate alignment)
+- [x] Preprocessing script — denoise, Z-up + Manhattan alignment, metric scaling (`preprocess_for_spatiallm.py`)
 - [ ] Multi-room / multi-floor merge
 - [ ] Evaluation on residential scan dataset
 
