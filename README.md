@@ -155,6 +155,19 @@ python inference.py \
 | `--no_cleanup` | off | Skip point cloud denoising |
 | `--seed` | -1 | Set for reproducible results |
 
+### Step 3b — Run via the Streamlit GUI (optional)
+
+Instead of running the three steps above from the terminal, you can use the browser-based interface:
+
+```bash
+# Inside WSL2
+pip install streamlit rerun-sdk
+streamlit run spatiallm_gui.py
+# then open http://localhost:8501 in your Windows browser
+```
+
+The GUI exposes the same preprocessing and inference parameters through a sidebar, streams live logs for each step, and provides download buttons for the cleaned PLY, layout TXT, and RRD visualization file. It also embeds the Rerun 3D viewer directly in the page.
+
 ### Step 4 — Visualize (optional)
 
 ```bash
@@ -230,6 +243,7 @@ The pipeline is currently developed and tested on the following setup:
 .
 ├── preprocess_for_spatiallm.py  # Point cloud cleaning, alignment, and scaling
 ├── inference.py                 # SpatialLM inference — point cloud → layout text
+├── spatiallm_gui.py             # Streamlit web UI — upload PLY → full pipeline → download results
 ├── visualize.py                 # Rerun-based 3D preview
 ├── eval.py                      # Benchmark evaluation
 ├── train.py                     # Fine-tuning entry point
@@ -254,6 +268,9 @@ The pipeline is currently developed and tested on the following setup:
 - [ ] IFC builder: Door/Window → `IfcDoor` / `IfcWindow`
 - [ ] IFC builder: Furniture OBBs → `IfcFurnishingElement`
 - [x] Preprocessing script — denoise, Z-up + Manhattan alignment, metric scaling (`preprocess_for_spatiallm.py`)
+- [x] Robust RANSAC-based floor detection in Z-up alignment (cascaded slices + PCA fallback)
+- [x] Deterministic inference (fixed global seed, greedy decoding)
+- [x] Streamlit GUI — full pipeline in a browser tab (`spatiallm_gui.py`)
 - [ ] Multi-room / multi-floor merge
 - [ ] Evaluation on residential scan dataset
 

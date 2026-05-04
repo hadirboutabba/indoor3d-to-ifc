@@ -73,79 +73,141 @@ def keep_largest_cluster(pcd, eps=0.05, min_points=20, verbose=True):
 
 
 # ---------------------------------------------------------------------------
-# ★ ÉTAPE 1 : Alignement Z-up (PCA)
+# ÉTAPE 1 : Alignement Z-up — détection robuste du SOL
 # ---------------------------------------------------------------------------
 
 def align_z_up_pca(pcd, verbose=True):
-    """Oriente Z vers le haut via PCA sur la direction de moindre variance."""
+    """
+    Stratégie en cascade pour trouver le plan de sol réel :
+
+    1. RANSAC sur les points du bas (percentile 0-15%)  → cible le sol directement
+    2. Si score < 0.85 : RANSAC sur percentile 0-25%   → sol élargi
+    3. Si score < 0.85 : RANSAC sur percentile 0-10%   → sol strict
+    4. Fallback PCA globale si tout échoue
+
+    Un plan est considéré "horizontal" si |normal.Z| > 0.85 (angle < 32° par rapport au sol).
+    La meilleure normale (score = |dot(normal, Z)|) est conservée.
+    """
     points = np.asarray(pcd.points)
-    centroid = points.mean(axis=0)
-    centered = points - centroid
+    z_min, z_max = points[:, 2].min(), points[:, 2].max()
+    z_range = z_max - z_min
 
-    cov = np.cov(centered.T)
-    eigenvalues, eigenvectors = np.linalg.eigh(cov)
-    up_axis = eigenvectors[:, 0]
-    if up_axis[2] < 0:
-        up_axis = -up_axis
+    best_normal = None
+    best_score = -1.0
 
+    # Tranches de points à tester, de la plus ciblée à la plus large
+    slices = [
+        ("sol 0-15%",  0.00, 0.15),
+        ("sol 0-25%",  0.00, 0.25),
+        ("sol 0-10%",  0.00, 0.10),
+        ("sol 5-20%",  0.05, 0.20),
+    ]
+
+    for label_s, z_lo, z_hi in slices:
+        mask = (points[:, 2] >= z_min + z_lo * z_range) & \
+               (points[:, 2] <= z_min + z_hi * z_range)
+        pts_slice = points[mask]
+
+        if len(pts_slice) < 50:
+            continue
+
+        slice_pcd = o3d.geometry.PointCloud()
+        slice_pcd.points = o3d.utility.Vector3dVector(pts_slice)
+
+        try:
+            plane_model, inliers = slice_pcd.segment_plane(
+                distance_threshold=0.03,
+                ransac_n=3,
+                num_iterations=2000
+            )
+        except Exception:
+            continue
+
+        [a, b, c, d] = plane_model
+        normal = np.array([a, b, c])
+        normal /= np.linalg.norm(normal)
+        score = abs(normal[2])  # 1.0 = parfaitement horizontal
+
+        if verbose:
+            print(f"  [RANSAC {label_s}] score={score:.3f} "
+                  f"normal=[{a:.2f},{b:.2f},{c:.2f}] "
+                  f"inliers={len(inliers):,}/{len(pts_slice):,}")
+
+        if score > best_score:
+            best_score = score
+            best_normal = normal.copy()
+
+        # Assez bon → on s'arrête
+        if best_score >= 0.97:
+            break
+
+    # Fallback PCA si aucune tranche n'a donné un plan horizontal
+    if best_normal is None or best_score < 0.85:
+        if verbose:
+            print(f"  ⚠️  RANSAC insuffisant (best_score={best_score:.3f}), fallback PCA")
+        centroid = points.mean(axis=0)
+        cov = np.cov((points - centroid).T)
+        _, eigenvectors = np.linalg.eigh(cov)
+        best_normal = eigenvectors[:, 0]
+        best_score = abs(best_normal[2])
+
+    # S'assurer que la normale pointe vers le haut
+    if best_normal[2] < 0:
+        best_normal = -best_normal
+
+    # Construire la rotation qui aligne best_normal sur (0,0,1)
     z = np.array([0.0, 0.0, 1.0])
-    v = np.cross(up_axis, z)
+    v = np.cross(best_normal, z)
     s = np.linalg.norm(v)
-    c = np.dot(up_axis, z)
+    c_dot = np.dot(best_normal, z)
+    angle_deg = np.degrees(np.arccos(np.clip(c_dot, -1, 1)))
 
     if s < 1e-6:
-        R = np.eye(3) if c > 0 else -np.eye(3)
+        R = np.eye(3) if c_dot > 0 else -np.eye(3)
     else:
         vx = np.array([[0, -v[2], v[1]],
                        [v[2],  0, -v[0]],
                        [-v[1], v[0],  0]])
-        R = np.eye(3) + vx + vx @ vx * ((1 - c) / (s ** 2))
+        R = np.eye(3) + vx + vx @ vx * ((1 - c_dot) / (s ** 2))
 
-    rotated = (R @ centered.T).T
+    centroid = points.mean(axis=0)
+    rotated = (R @ (points - centroid).T).T
     rotated[:, 2] -= rotated[:, 2].min()
     pcd.points = o3d.utility.Vector3dVector(rotated)
+
     if verbose:
-        print("  Alignement Z-up (PCA)")
+        print(f"  ✅ Z-up final: correction={angle_deg:.2f}° | "
+              f"score_horizontal={best_score:.3f} "
+              f"({'excellent' if best_score > 0.97 else 'bon' if best_score > 0.90 else 'moyen'})")
     return pcd
 
 
 # ---------------------------------------------------------------------------
-# ★ ÉTAPE 2 : Alignement Manhattan (rotation XY)  ← NOUVEAU
+# ÉTAPE 2 : Alignement Manhattan (rotation XY)
 # ---------------------------------------------------------------------------
 
 def align_manhattan(pcd, verbose=True):
     """
     Après Z-up, aligne les murs sur les axes X/Y (convention SpatialLM).
-
-    Principe :
-      - Isole les points "muraux" (Z entre 20% et 80% de la hauteur)
-      - Fait une PCA 2D sur la projection XY de ces points
-      - Tourne le nuage autour de Z pour aligner la direction dominante sur X
-
-    Résultat : les murs sont parallèles aux plans XZ et YZ,
-    ce que SpatialLM attend pour bien détecter les walls.
+    PCA 2D sur les points muraux (tranche Z 20%-80%).
     """
     points = np.asarray(pcd.points)
-
-    # 1. Isoler les points muraux (tranche Z médiane)
     z_min, z_max = points[:, 2].min(), points[:, 2].max()
     z_range = z_max - z_min
     mask = (points[:, 2] > z_min + 0.2 * z_range) & \
            (points[:, 2] < z_min + 0.8 * z_range)
-    wall_pts = points[mask, :2]  # projection XY uniquement
+    wall_pts = points[mask, :2]
 
     if len(wall_pts) < 100:
         if verbose:
             print("  Manhattan: pas assez de points muraux, skip")
         return pcd
 
-    # 2. PCA 2D → direction dominante des murs
     cov2d = np.cov(wall_pts.T)
     _, vecs = np.linalg.eigh(cov2d)
-    dominant = vecs[:, 1]  # vecteur de plus grande variance = direction du mur principal
+    dominant = vecs[:, 1]
     angle = np.arctan2(dominant[1], dominant[0])
 
-    # 3. Rotation 2D autour de Z pour aligner ce mur sur l'axe X
     cos_a, sin_a = np.cos(-angle), np.sin(-angle)
     R_z = np.array([
         [cos_a, -sin_a, 0],
@@ -153,12 +215,11 @@ def align_manhattan(pcd, verbose=True):
         [0,      0,     1]
     ])
     rotated = (R_z @ points.T).T
-    # Remettre le sol à z=0 après rotation (la rotation Z ne change pas Z, mais par sécurité)
     rotated[:, 2] -= rotated[:, 2].min()
     pcd.points = o3d.utility.Vector3dVector(rotated)
 
     if verbose:
-        print(f"  Manhattan: rotation Z de {np.degrees(angle):.1f}° → murs alignés sur X/Y")
+        print(f"  Manhattan: rotation Z de {np.degrees(angle):.1f}° → murs alignés X/Y")
     return pcd
 
 
@@ -222,10 +283,10 @@ def process_one(in_path, out_path, args):
     if args.keep_largest_cluster:
         pcd = keep_largest_cluster(pcd, eps=args.dbscan_eps, min_points=args.dbscan_min_points)
 
-    # 3. Alignement Z-up
+    # 3. Alignement Z-up (RANSAC sol) + Manhattan (XY)
     if not args.no_align:
-        pcd = align_z_up_pca(pcd)       # ← Z vers le haut
-        pcd = align_manhattan(pcd)      # ← murs alignés sur X/Y  ★ NOUVEAU
+        pcd = align_z_up_pca(pcd)   # détection robuste du sol
+        pcd = align_manhattan(pcd)  # murs alignés sur X/Y
 
     # 4. Mise à l'échelle métrique
     if not args.no_scale:

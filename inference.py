@@ -11,6 +11,15 @@ from transformers import TextIteratorStreamer, set_seed
 
 from spatiallm import Layout
 from spatiallm.pcd import load_o3d_pcd, get_points_and_colors, cleanup_pcd, Compose
+import random
+
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+torch.cuda.manual_seed_all(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 DETECT_TYPE_PROMPT = {
     "all": "Detect walls, doors, windows, boxes.",
@@ -103,7 +112,7 @@ def generate_layout(
         attention_mask=attention_mask,
         streamer=streamer,
         max_new_tokens=max_new_tokens,
-        do_sample=True,
+        do_sample=False,
         use_cache=True,
         temperature=temperature,
         top_p=top_p,

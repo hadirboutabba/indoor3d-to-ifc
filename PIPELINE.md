@@ -66,7 +66,7 @@ This document describes the full pipeline from raw scanner output to IFC model, 
 |---|---|---|
 | 1. Denoise | `denoise()` | Removes statistical outliers; optionally adds a radius pass |
 | 2. Cluster filter | `keep_largest_cluster()` | Discards fragments by keeping only the DBSCAN largest cluster |
-| 3. Z-up alignment | `align_z_up_pca()` | Rotates the cloud so the gravity axis is Z, using the smallest-variance PCA eigenvector |
+| 3. Z-up alignment | `align_z_up_pca()` | Rotates the cloud so the gravity axis is Z; tries RANSAC floor detection on 4 overlapping bottom slices (0–15 %, 0–25 %, 0–10 %, 5–20 %) and falls back to PCA if the best horizontal score is below 0.85 |
 | 4. Manhattan alignment | `align_manhattan()` | Rotates around Z so the dominant wall direction is parallel to X/Y axes — required by SpatialLM |
 | 5. Metric scaling | `scale_to_metric()` | Rescales the cloud so the floor-to-ceiling height equals `--target_height` (default 2.5 m) |
 | 6. Voxel downsample | built-in | Optional uniform downsampling via `--voxel_size` |
