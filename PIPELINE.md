@@ -43,6 +43,13 @@ This document describes the full pipeline from raw scanner output to IFC model, 
                      │ layout .txt
                      ▼
 ┌─────────────────────────────────────────────┐
+│  VISUALIZATION  (visualize.py / GUI)        │
+│  • Rerun: point cloud + layout overlay      │
+│  • Plotly: interactive 3D maquette          │
+└─────────────────────────────────────────────┘
+                     │ layout .txt (validated)
+                     ▼
+┌─────────────────────────────────────────────┐
 │  IFC BUILDER  (ifc_builder.py — WIP)        │
 │  • Parse layout entities                    │
 │  • Map to IFC schema                        │
@@ -120,6 +127,55 @@ python preprocess_for_spatiallm.py -i noisy.ply -o clean.ply \
 | `--target_height` | `2.5` | Floor-to-ceiling target height (metres) |
 | `--voxel_size` | `0.0` | Voxel size for downsampling; `0` = disabled |
 | `--normalize_colors` | off | Shift color statistics to match SpatialLM training distribution |
+
+---
+
+## Visualization & interactive review
+
+After inference the layout can be reviewed through two complementary tools before being passed to the IFC builder.
+
+### Command-line (Rerun)
+
+```bash
+python visualize.py \
+  --point_cloud path/to/clean_scan.ply \
+  --layout     path/to/output.txt \
+  --save        preview.rrd
+
+rerun preview.rrd          # open in standalone Rerun viewer
+```
+
+`visualize.py` renders the raw point cloud with the detected walls, doors, windows, and bounding boxes overlaid in the Rerun 3D viewer. The `.rrd` file can be shared or replayed later.
+
+### Streamlit GUI — split-screen viewer
+
+Running `streamlit run spatiallm_gui.py` exposes the full pipeline as a browser interface. On completion, the results section shows a **split-screen 3D visualization**:
+
+| Panel | Technology | Content |
+|---|---|---|
+| Left | Rerun web viewer (launched on demand, port 9090) | Point cloud + detected layout elements overlaid in world space |
+| Right | Plotly (rendered immediately in-page) | Interactive architectural maquette — see below |
+
+**Plotly maquette details**
+
+The maquette is built directly from the layout `.txt` file:
+
+| Element | Rendering |
+|---|---|
+| Floor | Filled polygon — Delaunay triangulation of all wall bottom endpoints (warm stone color) |
+| Ceiling | Faint filled polygon at max wall height |
+| Walls | Solid cream-colored quads (`#ede5d8`, 90 % opacity) with per-surface diffuse lighting and thin edge outlines |
+| Doors | Opaque wood-brown panels (`#8b6343`) aligned along the host wall direction |
+| Windows | Semi-transparent glass-blue panels (`#87ceeb`, 45 % opacity) with specular highlight |
+| Furniture bboxes | Semi-transparent filled faces (32 % opacity) + wireframe edges + floating text label; one color per object category; legend in corner |
+
+Camera starts at a scaled isometric angle (eye distance proportional to room span). All elements are interactive: zoom, rotate, pan, hover for object name.
+
+**Dependencies**
+
+```bash
+pip install streamlit rerun-sdk plotly
+```
 
 ---
 
