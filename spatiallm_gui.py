@@ -302,8 +302,12 @@ def build_3d_figure(walls, wall_map, doors, windows, bboxes):
 # CONFIGURATION
 # =============================================================================
 SPATIALLM_DIR  = "/mnt/c/Users/hboutabb/SpatialLM"
-MODEL_PATH     = "/mnt/c/Users/hboutabb/SpatialLM1.1-Llama-1B"
 RERUN_WEB_PORT = 9090
+
+MODELS = {
+    "SpatialLM1.1 — Llama 1B  (recommandé, précis)":   "/mnt/c/Users/hboutabb/SpatialLM1.1-Llama-1B",
+    "SpatialLM1.1 — Qwen 0.5B (rapide, léger)":        "/mnt/c/Users/hboutabb/SpatialLM1.1-Qwen-0.5B",
+}
 
 # =============================================================================
 
@@ -389,6 +393,14 @@ with st.sidebar:
         no_denoise = False
 
     st.subheader("Inference")
+    model_label = st.selectbox(
+        "Modèle",
+        list(MODELS.keys()),
+        index=0,
+        help="Llama 1B : meilleure qualité (~6-7 GB VRAM) · Qwen 0.5B : plus rapide, moins de VRAM"
+    )
+    model_path = MODELS[model_label]
+
     detect_type = st.selectbox(
         "Type de détection",
         ["all", "arch", "object"],
@@ -407,7 +419,7 @@ with col1:
     )
 
 with col2:
-    st.metric("Modèle", "SpatialLM 1.1 Llama-1B")
+    st.metric("Modèle", "Llama 1B" if "Llama" in model_label else "Qwen 0.5B")
     _pp_label = {"🔧 Complet": mode, "📐 Alignement uniquement": "align only", "⏭️ Ignorer tout": "skipped"}
     st.metric("Preprocessing", _pp_label[preprocess_mode])
     st.metric("Detection", detect_type)
@@ -503,7 +515,7 @@ if uploaded:
                 "python", "inference.py",
                 "-p", infer_path,
                 "-o", layout_path,
-                "--model_path", MODEL_PATH,
+                "--model_path", model_path,
                 "--detect_type", detect_type,
                 "--seed", str(seed),
             ]
