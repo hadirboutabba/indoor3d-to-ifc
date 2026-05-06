@@ -321,27 +321,48 @@ with st.sidebar:
     st.header("⚙️ Paramètres")
 
     st.subheader("Preprocessing")
-    mode = st.selectbox(
-        "Mode de nettoyage",
-        ["conservative", "moderate", "aggressive"],
-        index=1,
-        help="conservative = préserve détails fins | moderate = équilibré | aggressive = bruit fort"
+    skip_preprocess = st.toggle(
+        "⏭️ Ignorer le preprocessing",
+        value=False,
+        help="Le .ply est déjà propre et aligné — passe directement à l'inférence sans modifier le nuage de points"
     )
-    keep_largest = st.checkbox(
-        "Garder le plus gros cluster (DBSCAN)",
-        value=True,
-        help="Élimine les blobs flottants isolés"
-    )
-    normalize_colors = st.checkbox(
-        "Normaliser les couleurs RGB",
-        value=True,
-        help="Aligne sur la distribution du SpatialLM-Testset"
-    )
-    target_height = st.number_input(
-        "Hauteur de plafond cible (m)",
-        min_value=2.0, max_value=5.0, value=2.5, step=0.1,
-        help="Hauteur réelle du plafond de la pièce scannée"
-    )
+
+    if skip_preprocess:
+        st.info("Preprocessing désactivé — le fichier sera utilisé tel quel.")
+        mode = "moderate"
+        keep_largest = False
+        normalize_colors = False
+        target_height = 2.5
+        no_align = False
+    else:
+        mode = st.selectbox(
+            "Mode de nettoyage",
+            ["conservative", "moderate", "aggressive"],
+            index=1,
+            help="conservative = préserve détails fins | moderate = équilibré | aggressive = bruit fort"
+        )
+        keep_largest = st.checkbox(
+            "Garder le plus gros cluster (DBSCAN)",
+            value=True,
+            help="Élimine les blobs flottants isolés"
+        )
+        normalize_colors = st.checkbox(
+            "Normaliser les couleurs RGB",
+            value=True,
+            help="Aligne sur la distribution du SpatialLM-Testset"
+        )
+        target_height = st.number_input(
+            "Hauteur de plafond cible (m)",
+            min_value=2.0, max_value=5.0, value=2.5, step=0.1,
+            help="Hauteur réelle du plafond de la pièce scannée"
+        )
+
+        st.subheader("Avancé")
+        no_align = st.checkbox(
+            "Skip alignement automatique",
+            value=False,
+            help="À cocher si déjà aligné dans CloudCompare"
+        )
 
     st.subheader("Inference")
     detect_type = st.selectbox(
@@ -350,13 +371,6 @@ with st.sidebar:
         help="all = tout | arch = murs/portes/fenêtres | object = meubles uniquement"
     )
     seed = st.number_input("Seed (reproductibilité)", value=42, step=1)
-
-    st.subheader("Avancé")
-    no_align = st.checkbox(
-        "Skip alignement automatique",
-        value=False,
-        help="À cocher si déjà aligné dans CloudCompare"
-    )
 
 # ── Zone principale ────────────────────────────────────────────────────────
 col1, col2 = st.columns([2, 1])
@@ -370,7 +384,7 @@ with col1:
 
 with col2:
     st.metric("Modèle", "SpatialLM 1.1 Llama-1B")
-    st.metric("Mode", mode)
+    st.metric("Preprocessing", "⏭️ Ignoré" if skip_preprocess else mode)
     st.metric("Detection", detect_type)
 
 
@@ -420,33 +434,40 @@ if uploaded:
 
     st.info(f"📌 Fichier reçu : `{uploaded.name}` ({uploaded.size / 1024 / 1024:.1f} MB)")
 
-    if st.button("🚀 Lancer le pipeline complet", type="primary", use_container_width=True):
+    btn_label = "🚀 Lancer : Inférence + Visualisation" if skip_preprocess else "🚀 Lancer le pipeline complet"
+    if st.button(btn_label, type="primary", use_container_width=True):
 
-        # ─── ÉTAPE 1 : Preprocessing ────────────────────────────────────────
-        with st.expander("📦 Étape 1/3 : Preprocessing", expanded=True):
-            cmd_preprocess = [
-                "python", "preprocess_for_spatiallm.py",
-                "-i", raw_path,
-                "-o", clean_path,
-                "--mode", mode,
-                "--target_height", str(target_height),
-            ]
-            if keep_largest:
-                cmd_preprocess.append("--keep_largest_cluster")
-            if normalize_colors:
-                cmd_preprocess.append("--normalize_colors")
-            if no_align:
-                cmd_preprocess.append("--no_align")
+        # ─── ÉTAPE 1 : Preprocessing (optionnel) ────────────────────────────
+        if skip_preprocess:
+            with st.expander("📦 Étape 1/3 : Preprocessing — ignoré", expanded=False):
+                st.info("⏭️ Preprocessing ignoré — le fichier original sera utilisé directement pour l'inférence.")
+            infer_path = raw_path
+        else:
+            with st.expander("📦 Étape 1/3 : Preprocessing", expanded=True):
+                cmd_preprocess = [
+                    "python", "preprocess_for_spatiallm.py",
+                    "-i", raw_path,
+                    "-o", clean_path,
+                    "--mode", mode,
+                    "--target_height", str(target_height),
+                ]
+                if keep_largest:
+                    cmd_preprocess.append("--keep_largest_cluster")
+                if normalize_colors:
+                    cmd_preprocess.append("--normalize_colors")
+                if no_align:
+                    cmd_preprocess.append("--no_align")
 
-            ok1 = run_command(cmd_preprocess, "Preprocessing")
-            if not ok1:
-                st.stop()
+                ok1 = run_command(cmd_preprocess, "Preprocessing")
+                if not ok1:
+                    st.stop()
+            infer_path = clean_path
 
         # ─── ÉTAPE 2 : Inférence ────────────────────────────────────────────
         with st.expander("🧠 Étape 2/3 : Inférence SpatialLM", expanded=True):
             cmd_inference = [
                 "python", "inference.py",
-                "-p", clean_path,
+                "-p", infer_path,
                 "-o", layout_path,
                 "--model_path", MODEL_PATH,
                 "--detect_type", detect_type,
@@ -460,7 +481,7 @@ if uploaded:
         with st.expander("🎨 Étape 3/3 : Génération visualisation .rrd", expanded=True):
             cmd_visualize = [
                 "python", "visualize.py",
-                "-p", clean_path,
+                "-p", infer_path,
                 "-l", layout_path,
                 "--save", rrd_path,
             ]
@@ -469,7 +490,7 @@ if uploaded:
                 st.stop()
 
         # Sauvegarde dans le state pour persistance
-        st.session_state["clean_path"]    = clean_path
+        st.session_state["clean_path"]    = infer_path
         st.session_state["layout_path"]   = layout_path
         st.session_state["rrd_path"]      = rrd_path
         st.session_state["base"]          = base
