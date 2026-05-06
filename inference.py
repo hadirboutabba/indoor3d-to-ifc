@@ -102,7 +102,7 @@ def generate_layout(
     input_ids = input_ids.to(model.device)
 
     streamer = TextIteratorStreamer(
-        tokenizer, timeout=20.0, skip_prompt=True, skip_special_tokens=True
+        tokenizer, timeout=600.0, skip_prompt=True, skip_special_tokens=True
     )
 
     attention_mask = torch.ones_like(input_ids)
