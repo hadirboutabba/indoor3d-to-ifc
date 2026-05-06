@@ -161,12 +161,21 @@ Instead of running the three steps above from the terminal, you can use the brow
 
 ```bash
 # Inside WSL2
-pip install streamlit rerun-sdk
+pip install streamlit rerun-sdk plotly
 streamlit run spatiallm_gui.py
 # then open http://localhost:8501 in your Windows browser
 ```
 
-The GUI exposes the same preprocessing and inference parameters through a sidebar, streams live logs for each step, and provides download buttons for the cleaned PLY, layout TXT, and RRD visualization file. It also embeds the Rerun 3D viewer directly in the page.
+The GUI exposes the same preprocessing and inference parameters through a sidebar, streams live logs for each step, and provides download buttons for the cleaned PLY, layout TXT, and RRD file.
+
+Once the pipeline completes the results section shows a **split-screen 3D viewer**:
+
+| Panel | Technology | What it shows |
+|---|---|---|
+| Left | Rerun (web viewer, launched on demand) | Raw point cloud + detected layout overlaid |
+| Right | Plotly (rendered immediately in-page) | Interactive 3D architectural maquette — filled walls, floor polygon, door/window panels, semi-transparent furniture boxes with floating labels |
+
+The Plotly maquette uses Delaunay triangulation of wall endpoints to fill the room footprint, applies per-surface lighting for a realistic look, and scales the camera automatically to the room size.
 
 ### Step 4 — Visualize (optional)
 
@@ -271,6 +280,7 @@ The pipeline is currently developed and tested on the following setup:
 - [x] Robust RANSAC-based floor detection in Z-up alignment (cascaded slices + PCA fallback)
 - [x] Deterministic inference (fixed global seed, greedy decoding)
 - [x] Streamlit GUI — full pipeline in a browser tab (`spatiallm_gui.py`)
+- [x] Split-screen 3D visualization — Rerun point cloud viewer + interactive Plotly architectural maquette
 - [ ] Multi-room / multi-floor merge
 - [ ] Evaluation on residential scan dataset
 
