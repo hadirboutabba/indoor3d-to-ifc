@@ -275,12 +275,15 @@ def process_one(in_path, out_path, args):
     print(f"  Chargé : {n_init:,} points | couleurs={pcd.has_colors()}")
 
     # 1. Nettoyage du bruit
-    pcd = denoise(pcd, mode=args.mode, nb_neighbors=args.nb_neighbors,
-                  std_ratio=args.std_ratio, use_radius=args.use_radius,
-                  radius=args.radius, radius_min_points=args.radius_min_points)
+    if not args.no_denoise:
+        pcd = denoise(pcd, mode=args.mode, nb_neighbors=args.nb_neighbors,
+                      std_ratio=args.std_ratio, use_radius=args.use_radius,
+                      radius=args.radius, radius_min_points=args.radius_min_points)
+    else:
+        print("  Denoise: ignoré (--no_denoise)")
 
     # 2. Garder uniquement le plus gros cluster
-    if args.keep_largest_cluster:
+    if args.keep_largest_cluster and not args.no_denoise:
         pcd = keep_largest_cluster(pcd, eps=args.dbscan_eps, min_points=args.dbscan_min_points)
 
     # 3. Alignement Z-up (RANSAC sol) + Manhattan (XY)
@@ -331,6 +334,8 @@ if __name__ == "__main__":
     p.add_argument("-o", "--output", required=True, help=".ply ou dossier de sortie")
 
     grp = p.add_argument_group("Nettoyage")
+    grp.add_argument("--no_denoise", action="store_true",
+                     help="Skip denoising and DBSCAN — keep all points, only run alignment + scaling")
     grp.add_argument("--mode", choices=["conservative", "moderate", "aggressive"],
                      default="moderate")
     grp.add_argument("--nb_neighbors", type=int, default=None)

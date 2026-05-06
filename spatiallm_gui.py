@@ -321,20 +321,19 @@ with st.sidebar:
     st.header("⚙️ Paramètres")
 
     st.subheader("Preprocessing")
-    skip_preprocess = st.toggle(
-        "⏭️ Ignorer le preprocessing",
-        value=False,
-        help="Le .ply est déjà propre et aligné — passe directement à l'inférence sans modifier le nuage de points"
+    preprocess_mode = st.radio(
+        "Mode",
+        options=["🔧 Complet", "📐 Alignement uniquement", "⏭️ Ignorer tout"],
+        index=0,
+        help=(
+            "**Complet** — dénoise + alignement Z-up/Manhattan + mise à l'échelle\n\n"
+            "**Alignement uniquement** — scan propre mais axes incorrects : "
+            "garde tous les points, applique uniquement l'alignement et la mise à l'échelle\n\n"
+            "**Ignorer tout** — scan déjà propre ET aligné : passe directement à l'inférence"
+        ),
     )
 
-    if skip_preprocess:
-        st.info("Preprocessing désactivé — le fichier sera utilisé tel quel.")
-        mode = "moderate"
-        keep_largest = False
-        normalize_colors = False
-        target_height = 2.5
-        no_align = False
-    else:
+    if preprocess_mode == "🔧 Complet":
         mode = st.selectbox(
             "Mode de nettoyage",
             ["conservative", "moderate", "aggressive"],
@@ -356,13 +355,38 @@ with st.sidebar:
             min_value=2.0, max_value=5.0, value=2.5, step=0.1,
             help="Hauteur réelle du plafond de la pièce scannée"
         )
-
-        st.subheader("Avancé")
         no_align = st.checkbox(
             "Skip alignement automatique",
             value=False,
             help="À cocher si déjà aligné dans CloudCompare"
         )
+        no_denoise = False
+
+    elif preprocess_mode == "📐 Alignement uniquement":
+        st.info("Dénoise ignoré — tous les points conservés.\nAlignement Z-up + Manhattan + échelle appliqués.")
+        normalize_colors = st.checkbox(
+            "Normaliser les couleurs RGB",
+            value=True,
+            help="Aligne sur la distribution du SpatialLM-Testset"
+        )
+        target_height = st.number_input(
+            "Hauteur de plafond cible (m)",
+            min_value=2.0, max_value=5.0, value=2.5, step=0.1,
+            help="Hauteur réelle du plafond de la pièce scannée"
+        )
+        mode = "moderate"
+        keep_largest = False
+        no_align = False
+        no_denoise = True
+
+    else:  # Ignorer tout
+        st.info("Preprocessing ignoré — le fichier sera utilisé tel quel.")
+        mode = "moderate"
+        keep_largest = False
+        normalize_colors = False
+        target_height = 2.5
+        no_align = False
+        no_denoise = False
 
     st.subheader("Inference")
     detect_type = st.selectbox(
@@ -384,7 +408,8 @@ with col1:
 
 with col2:
     st.metric("Modèle", "SpatialLM 1.1 Llama-1B")
-    st.metric("Preprocessing", "⏭️ Ignoré" if skip_preprocess else mode)
+    _pp_label = {"🔧 Complet": mode, "📐 Alignement uniquement": "align only", "⏭️ Ignorer tout": "skipped"}
+    st.metric("Preprocessing", _pp_label[preprocess_mode])
     st.metric("Detection", detect_type)
 
 
@@ -434,16 +459,23 @@ if uploaded:
 
     st.info(f"📌 Fichier reçu : `{uploaded.name}` ({uploaded.size / 1024 / 1024:.1f} MB)")
 
-    btn_label = "🚀 Lancer : Inférence + Visualisation" if skip_preprocess else "🚀 Lancer le pipeline complet"
-    if st.button(btn_label, type="primary", use_container_width=True):
+    _btn_labels = {
+        "🔧 Complet":              "🚀 Lancer le pipeline complet",
+        "📐 Alignement uniquement": "🚀 Lancer : Alignement + Inférence + Visualisation",
+        "⏭️ Ignorer tout":          "🚀 Lancer : Inférence + Visualisation",
+    }
+    if st.button(_btn_labels[preprocess_mode], type="primary", use_container_width=True):
 
-        # ─── ÉTAPE 1 : Preprocessing (optionnel) ────────────────────────────
-        if skip_preprocess:
+        # ─── ÉTAPE 1 : Preprocessing ────────────────────────────────────────
+        if preprocess_mode == "⏭️ Ignorer tout":
             with st.expander("📦 Étape 1/3 : Preprocessing — ignoré", expanded=False):
-                st.info("⏭️ Preprocessing ignoré — le fichier original sera utilisé directement pour l'inférence.")
+                st.info("⏭️ Preprocessing ignoré — le fichier original sera utilisé directement.")
             infer_path = raw_path
         else:
-            with st.expander("📦 Étape 1/3 : Preprocessing", expanded=True):
+            step_label = ("📦 Étape 1/3 : Alignement + Échelle"
+                          if preprocess_mode == "📐 Alignement uniquement"
+                          else "📦 Étape 1/3 : Preprocessing")
+            with st.expander(step_label, expanded=True):
                 cmd_preprocess = [
                     "python", "preprocess_for_spatiallm.py",
                     "-i", raw_path,
@@ -451,6 +483,8 @@ if uploaded:
                     "--mode", mode,
                     "--target_height", str(target_height),
                 ]
+                if no_denoise:
+                    cmd_preprocess.append("--no_denoise")
                 if keep_largest:
                     cmd_preprocess.append("--keep_largest_cluster")
                 if normalize_colors:
