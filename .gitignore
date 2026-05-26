@@ -174,3 +174,4 @@ pcd/
 scans/
 checkpoints/
 wandb/
+run_*/
