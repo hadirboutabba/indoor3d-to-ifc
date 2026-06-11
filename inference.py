@@ -63,11 +63,11 @@ def generate_layout(
     point_cloud,
     tokenizer,
     code_template_file,
-    top_k=10,
-    top_p=0.95,
-    temperature=0.6,
+    top_k=0,
+    top_p=1.0,
+    temperature=1.0,
     num_beams=1,
-    seed=-1,
+    seed=42,
     max_new_tokens=4096,
     detect_type="all",
     categories=[],
@@ -108,18 +108,18 @@ def generate_layout(
     attention_mask = torch.ones_like(input_ids)
 
     generate_kwargs = dict(
-        {"input_ids": input_ids, "point_clouds": point_cloud},
-        attention_mask=attention_mask,
-        streamer=streamer,
-        max_new_tokens=max_new_tokens,
-        do_sample=False,
-        use_cache=True,
-        temperature=temperature,
-        top_p=top_p,
-        top_k=top_k,
-        num_beams=num_beams,
-        repetition_penalty=repetition_penalty,
-    )
+    {"input_ids": input_ids, "point_clouds": point_cloud},
+    attention_mask=attention_mask,
+    streamer=streamer,
+    max_new_tokens=max_new_tokens,
+    do_sample=False,
+    temperature=1.0,      # neutre quand do_sample=False
+    top_p=1.0,            # désactivé
+    top_k=0,              # désactivé
+    num_beams=1,
+    use_cache=True,
+    repetition_penalty=repetition_penalty,
+)
     t = Thread(target=model.generate, kwargs=generate_kwargs)
     t.start()
 

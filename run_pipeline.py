@@ -98,6 +98,9 @@ def main():
     p.add_argument("--detect_type",
                    choices=["all", "arch", "object"], default="all",
                    help="Éléments à détecter (défaut: all)")
+    # À ajouter dans le bloc argparse de run_pipeline.py
+    p.add_argument("--seed", type=int, default=42,
+               help="Seed pour la reproductibilité de l'inférence (défaut: 42)")
     p.add_argument("--inference_python", default=None,
                    help="Interpréteur Python alternatif pour l'inférence "
                         "(ex: /opt/conda/envs/spatiallm/bin/python). "
@@ -179,16 +182,17 @@ def main():
     # ─────────────────────────────────────────────────────────────────
     step("ÉTAPE 2 / 4 — Inférence SpatialLM")
     timings["inference"] = run(
-        [
-            inference_python,
-            str(script_dir / "inference.py"),
-            "--point_cloud", str(clean_ply),
-            "--output",      str(raw_layout),
-            "--model_path",  args.model,
-            "--detect_type", args.detect_type,
-        ],
-        "Inférence SpatialLM",
-    )
+    [
+        inference_python,
+        str(script_dir / "inference.py"),
+        "--point_cloud", str(clean_ply),
+        "--output",      str(raw_layout),
+        "--model_path",  args.model,
+        "--detect_type", args.detect_type,
+        "--seed",        str(args.seed),   # ← ajout
+    ],
+    "Inférence SpatialLM",
+)
 
     # ─────────────────────────────────────────────────────────────────
     #  ÉTAPE 3 — Post-processing
