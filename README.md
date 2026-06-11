@@ -1,72 +1,85 @@
 # Indoor3D-to-IFC
 
-A pipeline for converting 3D point cloud scans of residential buildings into structured **IFC (Industry Foundation Classes)** BIM models, using [SpatialLM](https://github.com/manycore-research/SpatialLM) as the scene-understanding backbone.
+Convert a 3D point cloud scan of a building into a standards-compliant **IFC (Industry Foundation Classes)** BIM model using [SpatialLM](https://github.com/manycore-research/SpatialLM) as the scene-understanding backbone.
+
+```
+raw scan (.ply)
+      │
+      ▼  preprocess_for_spatiallm.py
+clean, axis-aligned cloud
+      │
+      ▼  inference.py  (SpatialLM 1.1)
+structured layout (.txt)
+      │
+      ▼  postprocess.py
+corrected layout (.txt)
+      │
+      ▼  spatiallm_to_ifc.py
+BIM model (.ifc)
+```
 
 ---
 
-## Overview
+## What it detects
 
-This project automates the journey from a raw 3D scan of a residential interior to a standards-compliant IFC building model:
-
-```
-Slamtec Aurora S (or any scanner)
-        │
-        ▼ raw PLY point cloud
-  ┌──────────────────┐
-  │   Preprocessor   │  ← denoise · align Z-up · align walls to X/Y · scale to metres
-  └──────────────────┘
-        │
-        ▼ clean, axis-aligned PLY
-  ┌─────────────┐
-  │  SpatialLM  │  ← detects walls, doors, windows, furniture (oriented bounding boxes)
-  └─────────────┘
-        │
-        ▼ structured layout (.txt)
-  ┌─────────────┐
-  │ IFC Builder │  ← converts spatial entities to IFC elements (IfcWall, IfcDoor, …)
-  └─────────────┘
-        │
-        ▼ .ifc model
-  Any BIM / CAD tool (Revit, ArchiCAD, BlenderBIM, …)
-```
-
-**Supported input sources**
-
-| Scanner | Output format | Notes |
-|---|---|---|
-| Slamtec Aurora S | `.ply` | Primary target — exports axis-aligned point clouds |
-| Any LiDAR sensor | `.ply` | Z-axis must be the up axis |
-| Monocular video + MASt3R-SLAM | `.ply` | Works well for quick surveys |
-| RGBD cameras | `.ply` | After point cloud reconstruction |
-
-**What SpatialLM detects**
-
-| Entity | IFC equivalent |
+| SpatialLM output | IFC element |
 |---|---|
-| Wall segment (start/end/height/thickness) | `IfcWall` |
-| Door (wall reference, position, size) | `IfcDoor` |
-| Window (wall reference, position, size) | `IfcWindow` |
+| Wall segment (start · end · height · thickness) | `IfcWall` |
+| Door (parent wall · position · size) | `IfcDoor` |
+| Window (parent wall · position · size) | `IfcWindow` |
 | Oriented bounding box (59 furniture categories) | `IfcFurnishingElement` |
+| Room footprint (convex hull of wall endpoints) | `IfcSlab` |
 
 ---
 
 ## Models
 
-SpatialLM weights used by this project:
-
-| Model | Size | Link |
+| Model | Size | HuggingFace |
 |---|---|---|
-| SpatialLM1.1-Qwen-0.5B | 0.5B | [HuggingFace](https://huggingface.co/manycore-research/SpatialLM1.1-Qwen-0.5B) |
-| SpatialLM1.1-Llama-1B | 1B | [HuggingFace](https://huggingface.co/manycore-research/SpatialLM1.1-Llama-1B) |
+| SpatialLM1.1-Llama-1B | 1B | [manycore-research/SpatialLM1.1-Llama-1B](https://huggingface.co/manycore-research/SpatialLM1.1-Llama-1B) |
+| SpatialLM1.1-Qwen-0.5B | 0.5B | [manycore-research/SpatialLM1.1-Qwen-0.5B](https://huggingface.co/manycore-research/SpatialLM1.1-Qwen-0.5B) |
+
+Model weights are downloaded from HuggingFace automatically on first run.
 
 ---
 
-## Installation
+## Quick start — Docker (recommended)
+
+Docker packages the entire CUDA + Sonata stack. No conda environment to manage on the target device.
+
+**Requirements:** Docker, NVIDIA driver, [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+
+```bash
+git clone https://github.com/hadirboutabba/indoor3d-to-ifc.git
+cd indoor3d-to-ifc
+
+# Build the image (~20–40 min on first run — flash-attn compiles from source)
+docker compose build
+
+# Launch the Streamlit GUI at http://localhost:8501
+docker compose up
+```
+
+Place your `.ply` files in `./data/` — they are bind-mounted into the container at `/app/data/`.
+Outputs are written to `./output/`. Model weights are cached in a persistent Docker volume and
+downloaded only once.
+
+**CLI pipeline via Docker:**
+```bash
+docker compose run spatiallm python run_pipeline.py \
+  --input /app/data/scan.ply \
+  --output /app/output/model.ifc \
+  --model manycore-research/SpatialLM1.1-Qwen-0.5B
+```
+
+---
+
+## Installation — native (WSL2 / Linux)
 
 **Requirements:** Python 3.11 · PyTorch 2.4.1 · CUDA 12.4
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/indoor3d-to-ifc.git
+git clone https://github.com/hadirboutabba/indoor3d-to-ifc.git
 cd indoor3d-to-ifc
 
 conda create -n indoor3d python=3.11
@@ -80,209 +93,159 @@ poetry install
 poe install-sonata
 ```
 
-> **Note on Flash Attention:** If your GPU does not support Flash Attention or you encounter
-> installation issues, the encoder automatically falls back to standard attention.
+> Flash Attention requires Ampere (CC 8.0+) or newer. On older GPUs (e.g. Turing CC 7.5) the
+> encoder automatically falls back to standard attention — no action needed.
 
 ---
 
 ## Usage
 
-### Step 1 — Export your point cloud
-
-Export your scan as a `.ply` file. The Slamtec Aurora S exports directly to PLY; other sensors may require a reconstruction step first.
-
-### Step 2 — Preprocess
-
-`preprocess_for_spatiallm.py` cleans the cloud, aligns it to a Z-up / Manhattan frame, and rescales it to metric units — all requirements for reliable SpatialLM inference.
+### Option A — Streamlit GUI
 
 ```bash
-# Single file (default: moderate denoising)
-python preprocess_for_spatiallm.py -i raw_scan.ply -o clean_scan.ply
-
-# Aggressive denoising + keep only the main structure + voxel downsample
-python preprocess_for_spatiallm.py -i raw_scan.ply -o clean_scan.ply \
-    --mode aggressive \
-    --keep_largest_cluster \
-    --voxel_size 0.02
-
-# Batch: process every .ply in a folder
-python preprocess_for_spatiallm.py -i scans/ -o clean_scans/
+streamlit run pipeline_gui.py
+# Open http://localhost:8501
 ```
 
-**Denoising modes**
+The GUI covers the full pipeline from file upload to IFC download:
 
-| Mode | What it does |
-|---|---|
-| `conservative` | One gentle statistical pass — preserves fine details |
-| `moderate` (default) | One standard statistical pass — good all-round choice |
-| `aggressive` | Two passes + optional radius filter — best for noisy / sparse scans |
+- Upload a `.ply` by drag-and-drop
+- Configure each step from the sidebar (model, denoising mode, detection type, post-processing thresholds)
+- Live log streaming during execution
+- Interactive 3D maquette (Plotly) showing walls, doors, windows, and furniture with labels
+- Rerun point cloud viewer (launched on demand)
+- Download buttons for every intermediate and final output
 
-See [PIPELINE.md](./PIPELINE.md#preprocessing-script) for the full list of flags and a description of each processing step.
-
-### Step 3 — Run SpatialLM inference
+### Option B — One-command CLI pipeline
 
 ```bash
-# Full structured reconstruction (walls + doors + windows + furniture)
-python inference.py \
-  --point_cloud path/to/clean_scan.ply \
-  --output path/to/output.txt \
-  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B
+# Minimal
+python run_pipeline.py --input scan.ply --output model.ifc
 
-# Layout only (walls, doors, windows — no furniture)
-python inference.py \
-  --point_cloud path/to/scan.ply \
-  --output path/to/output.txt \
-  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B \
-  --detect_type arch
-
-# Specific furniture categories only
-python inference.py \
-  --point_cloud path/to/scan.ply \
-  --output path/to/output.txt \
-  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B \
-  --detect_type object \
-  --category sofa bed dining_table
+# Full options
+python run_pipeline.py \
+  --input  scan.ply \
+  --output model.ifc \
+  --model  manycore-research/SpatialLM1.1-Llama-1B \
+  --detect_type all \
+  --preprocess_mode moderate \
+  --seed 42 \
+  --workdir /tmp/pipeline_work
 ```
-
-**Key inference options**
 
 | Flag | Default | Description |
 |---|---|---|
-| `--detect_type` | `all` | `all` / `arch` / `object` |
-| `--category` | (all 59) | Subset of furniture categories to detect |
-| `--repetition_penalty` | `1.1` | Reduces repetitive predictions |
-| `--inference_dtype` | `bfloat16` | Use `float32` if bfloat16 is unsupported |
-| `--no_cleanup` | off | Skip point cloud denoising |
-| `--seed` | -1 | Set for reproducible results |
+| `--input` / `-i` | required | Raw `.ply` point cloud |
+| `--output` / `-o` | `<stem>.ifc` | Output IFC file |
+| `--workdir` / `-w` | input directory | Folder for intermediate files |
+| `--model` / `-m` | `SpatialLM-Llama-1B` | HuggingFace model name or local path |
+| `--detect_type` | `all` | `all` / `arch` (walls+openings) / `object` (furniture only) |
+| `--seed` | `42` | Random seed for reproducible inference |
+| `--preprocess_mode` | `moderate` | `conservative` / `moderate` / `aggressive` |
+| `--target_height` | `2.5` | Expected ceiling height in metres |
+| `--skip_preprocess` | off | Use the raw PLY as-is |
+| `--skip_postprocess` | off | Skip geometric correction |
+| `--inference_python` | current python | Alternate interpreter (useful when SpatialLM lives in a separate conda env) |
 
-### Step 3b — Run via the Streamlit GUI (optional)
+### Option C — Step by step
 
-Instead of running the three steps above from the terminal, you can use the browser-based interface:
-
+**Step 1 — Preprocess**
 ```bash
-# Inside WSL2
-pip install streamlit rerun-sdk plotly
-streamlit run spatiallm_gui.py
-# then open http://localhost:8501 in your Windows browser
+python preprocess_for_spatiallm.py \
+  -i raw_scan.ply -o clean_scan.ply \
+  --mode moderate --target_height 2.5
 ```
 
-The GUI exposes the same preprocessing and inference parameters through a sidebar, streams live logs for each step, and provides download buttons for the cleaned PLY, layout TXT, and RRD file.
+**Step 2 — Inference**
+```bash
+python inference.py \
+  --point_cloud clean_scan.ply \
+  --output layout_raw.txt \
+  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B \
+  --detect_type all
+```
 
-Once the pipeline completes the results section shows a **split-screen 3D viewer**:
+**Step 3 — Post-process**
+```bash
+python postprocess.py \
+  --layout layout_raw.txt \
+  --point_cloud clean_scan.ply \
+  --output layout_refined.txt
+```
 
-| Panel | Technology | What it shows |
+**Step 4 — Generate IFC**
+```bash
+python spatiallm_to_ifc.py \
+  --input layout_refined.txt \
+  --output model.ifc
+```
+
+---
+
+## Supported input sources
+
+| Source | Format | Notes |
 |---|---|---|
-| Left | Rerun (web viewer, launched on demand) | Raw point cloud + detected layout overlaid |
-| Right | Plotly (rendered immediately in-page) | Interactive 3D architectural maquette — filled walls, floor polygon, door/window panels, semi-transparent furniture boxes with floating labels |
-
-The Plotly maquette uses Delaunay triangulation of wall endpoints to fill the room footprint, applies per-surface lighting for a realistic look, and scales the camera automatically to the room size.
-
-### Step 4 — Visualize (optional)
-
-```bash
-python visualize.py \
-  --point_cloud path/to/scan.ply \
-  --layout path/to/output.txt \
-  --save preview.rrd
-
-rerun preview.rrd
-```
-
-### Step 5 — Convert to IFC
-
-> **Work in progress.** The IFC builder module is under active development.
-> See [PIPELINE.md](./PIPELINE.md) for the planned architecture.
-
-```bash
-# Coming soon
-python ifc_builder.py --layout path/to/output.txt --output model.ifc
-```
-
----
-
-## Output format
-
-The SpatialLM layout text file uses a Python dataclass-style schema (discretized integers):
-
-```python
-wall_0 = Wall(ax=..., ay=..., az=..., bx=..., by=..., bz=..., height=..., thickness=...)
-door_0 = Door(wall_id='wall_0', position_x=..., position_y=..., position_z=..., width=..., height=...)
-window_0 = Window(wall_id='wall_0', position_x=..., position_y=..., position_z=..., width=..., height=...)
-bbox_0 = Bbox(class='sofa', position_x=..., position_y=..., position_z=..., angle_z=..., scale_x=..., scale_y=..., scale_z=...)
-```
-
-See [PIPELINE.md](./PIPELINE.md) for how these map to IFC entities.
-
----
-
-## Development environment
-
-The pipeline is currently developed and tested on the following setup:
-
-**Host machine**
-
-| Component | Details |
-|---|---|
-| OS | Windows 11 + WSL2 (kernel 6.6.87.2-microsoft-standard-WSL2) |
-| CPU | Intel Core i7-10875H @ 2.30 GHz (8 cores) |
-| RAM | 16 GB |
-| GPU | NVIDIA GeForce RTX 2070 Super (8 GB VRAM, compute capability 7.5) |
-| GPU driver | 581.95 |
-
-**Software environment (inside WSL2)**
-
-| Component | Version |
-|---|---|
-| Python | 3.11.15 |
-| PyTorch | 2.4.1+cu124 |
-| CUDA toolkit | 12.4 |
-| Conda environment | `indoor3d` |
-
-**Hardware notes**
-
-- The RTX 2070 Super (Turing, CC 7.5) does **not** support Flash Attention, which requires Ampere (CC 8.0+) or newer. Flash Attention is therefore disabled in `spatiallm/model/sonata_encoder.py` and standard attention is used instead.
-- The 0.5B Qwen model fits comfortably in 8 GB VRAM during inference. The 1B Llama model requires approximately 6–7 GB and also runs on this card.
-- Full fine-tuning (~60 GB VRAM requirement) is not feasible on this machine. The project targets inference and lightweight adaptation only.
+| Slamtec Aurora S | `.ply` | Primary target |
+| Any LiDAR sensor | `.ply` | Z-axis must be up |
+| Monocular video + MASt3R-SLAM | `.ply` | Good for quick surveys |
+| RGBD cameras | `.ply` | After point cloud reconstruction |
 
 ---
 
 ## Project structure
 
 ```
-.
-├── preprocess_for_spatiallm.py  # Point cloud cleaning, alignment, and scaling
-├── inference.py                 # SpatialLM inference — point cloud → layout text
-├── spatiallm_gui.py             # Streamlit web UI — upload PLY → full pipeline → download results
+indoor3d-to-ifc/
+├── preprocess_for_spatiallm.py  # Denoise · Z-up align · Manhattan align · metric scale
+├── preprocess_large_building.py # Variant for large / multi-room buildings
+├── inference.py                 # SpatialLM inference: point cloud → layout TXT
+├── postprocess.py               # Geometric correction: merge collinear walls, refit bboxes
+├── spatiallm_to_ifc.py          # IFC generation: layout TXT → .ifc
+├── run_pipeline.py              # CLI orchestrator: runs all four steps in sequence
+├── pipeline_gui.py              # Streamlit GUI: full pipeline in a browser tab
+├── spatiallm_gui.py             # Original 3-step GUI (preprocess → infer → visualize)
 ├── visualize.py                 # Rerun-based 3D preview
 ├── eval.py                      # Benchmark evaluation
 ├── train.py                     # Fine-tuning entry point
-├── code_template.txt            # Schema fed to the LLM as generation context
+├── code_template.txt            # Schema fed to SpatialLM as generation context
+├── Dockerfile                   # CUDA 12.4 + full stack image
+├── docker-compose.yml           # GPU passthrough, volume mounts, port mapping
 ├── configs/
-│   └── spatiallm_sft.yaml       # Fine-tuning config
-├── spatiallm/
-│   ├── model/                   # SpatialLM model definitions (Llama / Qwen variants + Sonata encoder)
-│   ├── layout/                  # Layout parsing and coordinate handling
-│   ├── pcd/                     # Point cloud loading and preprocessing
-│   └── tuner/                   # Fine-tuning pipeline (data, trainer, hyperparams)
-└── PIPELINE.md                  # Detailed pipeline design and IFC mapping
+│   └── spatiallm_sft.yaml       # Fine-tuning configuration
+└── spatiallm/
+    ├── model/                   # SpatialLM model (Llama / Qwen + Sonata encoder)
+    ├── layout/                  # Layout parsing and coordinate handling
+    ├── pcd/                     # Point cloud loading and preprocessing
+    └── tuner/                   # Fine-tuning pipeline
 ```
+
+---
+
+## Hardware requirements
+
+| Component | Minimum | Notes |
+|---|---|---|
+| GPU VRAM | 6 GB | Qwen 0.5B: ~4 GB · Llama 1B: ~6–7 GB |
+| CUDA | 12.4 | Matches PyTorch 2.4.1+cu124 |
+| Flash Attention | optional | Requires Ampere (CC 8.0+); falls back automatically on older GPUs |
+| RAM | 16 GB | For point cloud loading |
 
 ---
 
 ## Roadmap
 
 - [x] SpatialLM inference on PLY point clouds
-- [x] Repetition penalty + attention mask fixes for stable generation
-- [ ] IFC builder: Wall → `IfcWall`
-- [ ] IFC builder: Door/Window → `IfcDoor` / `IfcWindow`
-- [ ] IFC builder: Furniture OBBs → `IfcFurnishingElement`
-- [x] Preprocessing script — denoise, Z-up + Manhattan alignment, metric scaling (`preprocess_for_spatiallm.py`)
-- [x] Robust RANSAC-based floor detection in Z-up alignment (cascaded slices + PCA fallback)
-- [x] Deterministic inference (fixed global seed, greedy decoding)
-- [x] Streamlit GUI — full pipeline in a browser tab (`spatiallm_gui.py`)
-- [x] Split-screen 3D visualization — Rerun point cloud viewer + interactive Plotly architectural maquette
-- [ ] Multi-room / multi-floor merge
-- [ ] Evaluation on residential scan dataset
+- [x] Greedy / deterministic decoding (fixed seed, `do_sample=False`)
+- [x] Preprocessing — denoise, Z-up + Manhattan alignment, metric scaling
+- [x] Geometric post-processing — collinear wall merging, bbox refitting
+- [x] IFC generation — `IfcWall`, `IfcDoor`, `IfcWindow`, `IfcFurnishingElement`, `IfcSlab`
+- [x] CLI pipeline orchestrator (`run_pipeline.py`)
+- [x] Streamlit GUI with live logs, 3D maquette, and download buttons
+- [x] Docker image for portable GPU deployment
+- [ ] True IFC openings (`IfcOpeningElement`) for doors and windows
+- [ ] Multi-room / multi-floor merging
+- [ ] Evaluation on a residential scan dataset
 
 ---
 
@@ -290,11 +253,11 @@ The pipeline is currently developed and tested on the following setup:
 
 - **SpatialLM** — [manycore-research/SpatialLM](https://github.com/manycore-research/SpatialLM) (NeurIPS 2025)
 - **Sonata encoder** — [xywu.me/sonata](https://xywu.me/sonata/)
-- **MASt3R-SLAM** — for monocular video reconstruction
+- **MASt3R-SLAM** — for monocular video-to-point-cloud reconstruction
 
 ---
 
 ## License
 
-The SpatialLM model weights are subject to the [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/).
+SpatialLM model weights are subject to the [Llama 3.2 Community License](https://www.llama.com/llama3_2/license/).
 Code in this repository is MIT licensed unless otherwise noted.

@@ -1,31 +1,50 @@
-# Documentation — Pipeline PLY → IFC avec SpatialLM
+# Technical Documentation — Indoor3D-to-IFC
 
-## Vue d'ensemble
+## Table of contents
 
-Ce projet implémente un pipeline complet de reconstruction BIM à partir d'un nuage de points 3D.  
-Il enchaîne automatiquement quatre étapes pour produire un fichier IFC standard à partir d'un scan `.ply` brut.
-
-```
-scan brut (.ply)
-      │
-      ▼ preprocess_for_spatiallm.py
-nuage nettoyé (_clean.ply)
-      │
-      ▼ inference.py
-layout brut (_raw_layout.txt)
-      │
-      ▼ postprocess.py
-layout raffiné (_refined_layout.txt)
-      │
-      ▼ spatiallm_to_ifc.py
-fichier BIM (.ifc)
-```
+1. [Pipeline overview](#1-pipeline-overview)
+2. [Layout TXT format](#2-layout-txt-format)
+3. [preprocess_for_spatiallm.py](#3-preprocess_for_spatiallmpy)
+4. [preprocess_large_building.py](#4-preprocess_large_buildingpy)
+5. [inference.py](#5-inferencepy)
+6. [postprocess.py](#6-postprocesspy)
+7. [spatiallm_to_ifc.py](#7-spatiallm_to_ifcpy)
+8. [run_pipeline.py](#8-run_pipelinepy)
+9. [pipeline_gui.py](#9-pipeline_guipy)
+10. [Docker](#10-docker)
+11. [IFC output structure](#11-ifc-output-structure)
+12. [Known limitations](#12-known-limitations)
 
 ---
 
-## Format TXT — Sortie SpatialLM
+## 1. Pipeline overview
 
-Tous les scripts partagent le même format de fichier texte produit par SpatialLM :
+```
+raw scan (.ply)
+      │
+      ▼  preprocess_for_spatiallm.py  (or preprocess_large_building.py)
+clean, axis-aligned cloud  (*_clean.ply)
+      │
+      ▼  inference.py
+raw layout  (*_raw_layout.txt)
+      │
+      ▼  postprocess.py
+corrected layout  (*_refined_layout.txt)
+      │
+      ▼  spatiallm_to_ifc.py
+BIM model  (*.ifc)
+```
+
+Each step can be run independently. `run_pipeline.py` chains all four in a single command.
+`pipeline_gui.py` exposes the same pipeline through a browser-based Streamlit interface.
+
+---
+
+## 2. Layout TXT format
+
+All scripts read and write the same text format produced by SpatialLM inference.
+
+**Schema**
 
 ```
 wall_0=Wall(x1, y1, z1, x2, y2, z2, height, thickness)
@@ -34,23 +53,23 @@ window_0=Window(parent_wall, cx, cy, cz, width, height)
 bbox_0=Bbox(label, cx, cy, cz, rotation_rad, length, width, height)
 ```
 
-**Signification des paramètres :**
+**Parameter reference**
 
-| Type | Paramètre | Unité | Description |
-|------|-----------|-------|-------------|
-| Wall | x1,y1,z1 | m | Point de départ dans le repère monde |
-| Wall | x2,y2,z2 | m | Point d'arrivée |
-| Wall | height | m | Hauteur du mur |
-| Wall | thickness | m | Épaisseur (souvent 0.0 — SpatialLM ne la prédit pas toujours) |
-| Door/Window | parent_wall | — | Nom du mur hôte (ex: `wall_1`) |
-| Door/Window | cx,cy,cz | m | Centre de l'ouverture dans le repère monde |
-| Door/Window | width,height | m | Dimensions de l'ouverture |
-| Bbox | label | — | Catégorie de l'objet (bed, chair, desk…) |
-| Bbox | cx,cy,cz | m | Centre de l'objet |
-| Bbox | rotation_rad | rad | Rotation autour de Z (sens anti-horaire depuis X) |
-| Bbox | length,width,height | m | Dimensions (length = plus longue dimension horizontale) |
+| Type | Parameter | Unit | Description |
+|---|---|---|---|
+| Wall | `x1,y1,z1` | m | Wall start point in world space |
+| Wall | `x2,y2,z2` | m | Wall end point in world space |
+| Wall | `height` | m | Wall height |
+| Wall | `thickness` | m | Wall thickness (may be 0.0 — not always predicted by SpatialLM) |
+| Door / Window | `parent_wall` | — | Name of the host wall (e.g. `wall_1`) |
+| Door / Window | `cx,cy,cz` | m | Centre of the opening in world space |
+| Door / Window | `width,height` | m | Opening dimensions |
+| Bbox | `label` | — | Furniture category (e.g. `sofa`, `bed`, `desk`) |
+| Bbox | `cx,cy,cz` | m | Object centre in world space |
+| Bbox | `rotation_rad` | rad | Rotation around Z axis (counter-clockwise from X) |
+| Bbox | `length,width,height` | m | Dimensions — length is the longest horizontal axis |
 
-**Exemple réel :**
+**Example**
 ```
 wall_1=Wall(-0.436,-1.986,0.25, 1.789,-0.136,0.25, 2.14, 0.0)
 window_0=Window(wall_1, 0.914,-0.786,1.55, 1.0, 1.02)
@@ -59,563 +78,500 @@ bbox_0=Bbox(chair,-0.386,-1.136,0.7, -0.785, 0.5625,0.515625,0.875)
 
 ---
 
-## Scripts
+## 3. preprocess_for_spatiallm.py
 
-### 1. `preprocess_for_spatiallm.py` — Nettoyage du nuage de points
+Prepares a raw `.ply` point cloud for SpatialLM inference: denoising, Z-up alignment,
+Manhattan frame alignment, and metric scaling.
 
-**Rôle :** Prépare un `.ply` brut pour l'inférence SpatialLM.  
-**Opérations :** débruitage (Statistical Outlier Removal), alignement Z-up + Manhattan, mise à l'échelle métrique, normalisation couleurs.
-
-**Fichier d'origine — non modifié.**
-
+**Usage**
 ```bash
 python preprocess_for_spatiallm.py \
-    -i raw_scan.ply \
-    -o clean_scan.ply \
-    --mode moderate \
-    --target_height 2.5 \
-    --keep_largest_cluster \
-    --normalize_colors
+  -i raw_scan.ply \
+  -o clean_scan.ply \
+  --mode moderate \
+  --target_height 2.5 \
+  --keep_largest_cluster \
+  --normalize_colors
 ```
 
-| Argument | Défaut | Description |
-|----------|--------|-------------|
-| `-i` / `--input` | requis | Fichier `.ply` d'entrée |
-| `-o` / `--output` | requis | Fichier `.ply` nettoyé |
-| `--mode` | `moderate` | Intensité du nettoyage : `conservative`, `moderate`, `aggressive` |
-| `--target_height` | `2.5` | Hauteur cible du plafond (m) pour la mise à l'échelle |
-| `--no_denoise` | False | Ignorer le débruitage |
-| `--no_align` | False | Ignorer l'alignement automatique |
-| `--keep_largest_cluster` | False | Garder uniquement le plus grand cluster DBSCAN |
-| `--normalize_colors` | False | Normaliser la distribution RGB |
+**Arguments**
+
+| Argument | Default | Description |
+|---|---|---|
+| `-i` / `--input` | required | Input `.ply` file or folder of `.ply` files |
+| `-o` / `--output` | required | Output cleaned `.ply` file or folder |
+| `--mode` | `moderate` | Denoising intensity: `conservative`, `moderate`, `aggressive` |
+| `--target_height` | `2.5` | Target ceiling height in metres — used for metric scaling |
+| `--no_denoise` | off | Skip statistical outlier removal |
+| `--no_align` | off | Skip automatic axis alignment |
+| `--keep_largest_cluster` | off | Discard everything except the largest DBSCAN cluster |
+| `--normalize_colors` | off | Normalise the RGB distribution |
+| `--voxel_size` | None | Voxel downsampling size in metres (e.g. `0.02`) |
+
+**Denoising modes**
+
+| Mode | Behaviour |
+|---|---|
+| `conservative` | One gentle statistical pass — preserves fine details |
+| `moderate` | One standard statistical pass — good default |
+| `aggressive` | Two passes + optional radius filter — best for noisy/sparse scans |
+
+**Processing pipeline (per file)**
+
+1. Load `.ply` with Open3D
+2. Statistical outlier removal (one or two passes depending on mode)
+3. Detect the floor plane with RANSAC (cascading Z-slices + PCA fallback) → rotate to Z-up
+4. PCA on horizontal plane → rotate to align walls with X/Y axes (Manhattan frame)
+5. Scale so that the detected floor-to-ceiling height matches `--target_height`
+6. Optional: keep only the largest cluster, normalise colours, voxel downsample
+7. Save cleaned `.ply`
 
 ---
 
-### 2. `inference.py` — Inférence SpatialLM
+## 4. preprocess_large_building.py
 
-**Rôle :** Analyse le nuage de points nettoyé et produit le layout TXT.  
-**Modèle :** LLaMA 1B ou Qwen 0.5B + encodeur de points Sonata.
+Variant of the preprocessor designed for large or multi-room buildings where the standard
+script may struggle with memory or produce poor alignment.
 
-**Fichier d'origine — non modifié.**
+**Usage**
+```bash
+python preprocess_large_building.py \
+  -i large_scan.ply \
+  -o clean_large.ply
+```
 
+Accepts the same core arguments as `preprocess_for_spatiallm.py`. Additional logic handles
+point clouds that exceed a configurable point count by processing them in spatial tiles.
+
+---
+
+## 5. inference.py
+
+Runs SpatialLM inference: loads the point cloud, encodes it with the Sonata point cloud
+encoder, and generates a structured layout using the language model head.
+
+**Usage**
 ```bash
 python inference.py \
-    -p clean_scan.ply \
-    -o layout.txt \
-    --model_path manycore-research/SpatialLM-Llama-1B \
-    --detect_type all
+  --point_cloud clean_scan.ply \
+  --output layout.txt \
+  --model_path manycore-research/SpatialLM1.1-Qwen-0.5B \
+  --detect_type all
 ```
 
-| Argument | Défaut | Description |
-|----------|--------|-------------|
-| `-p` / `--point_cloud` | requis | Nuage de points `.ply` |
-| `-o` / `--output` | requis | Fichier TXT de sortie |
-| `-m` / `--model_path` | `SpatialLM-Llama-1B` | Chemin local ou nom HuggingFace |
-| `-d` / `--detect_type` | `all` | `all` / `arch` (murs+portes+fenêtres) / `object` (bbox) |
+**Arguments**
 
-**Modèles disponibles :**
-- `manycore-research/SpatialLM1.1-Llama-1B` — précision maximale (~6 GB VRAM)
-- `manycore-research/SpatialLM1.1-Qwen-0.5B` — rapide, moins de VRAM
+| Argument | Default | Description |
+|---|---|---|
+| `-p` / `--point_cloud` | required | Input `.ply` file or folder of `.ply` files |
+| `-o` / `--output` | required | Output layout `.txt` file or folder |
+| `-m` / `--model_path` | `SpatialLM-Llama-1B` | HuggingFace model name or local path |
+| `-d` / `--detect_type` | `all` | `all` / `arch` (walls+openings) / `object` (furniture) |
+| `-c` / `--category` | all 59 | Subset of furniture categories (see full list below) |
+| `--repetition_penalty` | `1.1` | Penalises repeated tokens; values >1.0 reduce loops |
+| `--inference_dtype` | `bfloat16` | Use `float32` on GPUs that do not support bfloat16 |
+| `--no_cleanup` | off | Skip internal point cloud denoising |
+| `--seed` | `-1` | Set a non-negative integer for reproducible results |
+
+**Decoding behaviour**
+
+Inference uses greedy decoding (`do_sample=False`, `num_beams=1`). The `--top_k`,
+`--top_p`, and `--temperature` flags are accepted for CLI compatibility but do not affect
+output when `do_sample=False`. For reproducibility, a global seed is set at module load
+time (SEED = 42) in addition to the per-call `--seed` argument.
+
+**Supported furniture categories**
+
+```
+sofa  chair  dining_chair  bar_chair  stool  bed  pillow  wardrobe  nightstand
+tv_cabinet  wine_cabinet  bathroom_cabinet  shoe_cabinet  entrance_cabinet
+decorative_cabinet  washing_cabinet  wall_cabinet  sideboard  cupboard
+coffee_table  dining_table  side_table  dressing_table  desk  integrated_stove
+gas_stove  range_hood  micro-wave_oven  sink  stove  refrigerator  hand_sink
+shower  shower_room  toilet  tub  illumination  chandelier  floor-standing_lamp
+wall_decoration  painting  curtain  carpet  plants  potted_bonsai  tv  computer
+air_conditioner  washing_machine  clothes_rack  mirror  bookcase  cushion  bar
+screen  combination_sofa  dining_table_combination
+leisure_table_and_chair_combination  multifunctional_combination_bed
+```
 
 ---
 
-### 3. `postprocess.py` — Correction géométrique *(nouveau)*
+## 6. postprocess.py
 
-**Rôle :** Corrige les erreurs géométriques courantes du layout SpatialLM avant la génération IFC.  
-**Dépendances :** numpy, scipy, open3d.
+Corrects common SpatialLM detection errors using geometry before IFC generation.
 
+**Usage**
 ```bash
 python postprocess.py \
-    --layout raw_layout.txt \
-    --point_cloud clean_scan.ply \
-    --output refined_layout.txt
+  --layout raw_layout.txt \
+  --point_cloud clean_scan.ply \
+  --output refined_layout.txt
 ```
 
-| Argument | Défaut | Description |
-|----------|--------|-------------|
-| `-l` / `--layout` | requis | Layout TXT brut (sortie SpatialLM) |
-| `-p` / `--point_cloud` | requis | Nuage de points nettoyé |
-| `-o` / `--output` | requis | Layout TXT corrigé |
-| `--angle_thresh` | `10.0°` | Seuil d'angle pour détecter la colinéarité de deux murs |
-| `--dist_thresh` | `0.35 m` | Distance perpendiculaire max pour fusionner deux murs |
-| `--gap_thresh` | `0.60 m` | Espace max entre les projections de deux murs pour les fusionner |
-| `--min_points` | `50` | Nombre minimum de points dans une bbox pour la réaffiner |
+**Arguments**
 
-**Bibliothèques utilisées :**
+| Argument | Default | Description |
+|---|---|---|
+| `-l` / `--layout` | required | Raw SpatialLM layout TXT |
+| `-p` / `--point_cloud` | required | Cleaned point cloud `.ply` |
+| `-o` / `--output` | required | Corrected layout TXT |
+| `--angle_thresh` | `10.0°` | Max angle deviation for two walls to be considered collinear |
+| `--dist_thresh` | `0.35 m` | Max perpendicular distance between wall midpoints for merging |
+| `--gap_thresh` | `0.60 m` | Max projection gap between two wall segments for merging |
+| `--min_points` | `50` | Min point cloud points inside a bbox to trigger refitting |
 
-| Bibliothèque | Usage dans ce script |
-|---|---|
-| `numpy` | Toutes les opérations vectorielles et matricielles (projections, rotations, coins de bbox) |
-| `scipy.spatial.ConvexHull` | Enveloppe convexe 2D pour le rotating calipers (réaffinage bbox) |
-| `scipy.spatial.Delaunay` | Test d'appartenance de points à l'intérieur d'une bbox 3D |
-| `open3d` | Lecture du fichier `.ply` et accès aux points |
+### Algorithm 1 — Collinear wall detection
 
----
-
-**Algorithme 1 — Détection de murs colinéaires**
-
-SpatialLM divise parfois un mur réel en deux segments. La détection utilise trois tests géométriques en cascade — tous les trois doivent passer :
+SpatialLM sometimes splits a single real wall into two segments. Three geometric tests must
+all pass before two walls are considered collinear:
 
 ```
-are_collinear(w1, w2) :
+are_collinear(w1, w2):
 
-  Test 1 — Angle (mod 180° pour ignorer le sens)
+  Test 1 — Angle (mod 180° to ignore direction)
     a1 = atan2(dy1, dx1) mod 180°
     a2 = atan2(dy2, dx2) mod 180°
     diff = min(|a1−a2|, 180−|a1−a2|)
-    → diff < angle_thresh (défaut 10°)
+    → diff < angle_thresh
 
-  Test 2 — Distance perpendiculaire
-    midpoint de w2 : mx = (x1+x2)/2, my = (y1+y2)/2
+  Test 2 — Perpendicular distance
+    midpoint of w2: (mx, my)
     d = |−dy1·(mx−x1) + dx1·(my−y1)| / ‖(dx1,dy1)‖
-    → d < dist_thresh (défaut 0.35 m)
+    → d < dist_thresh
 
-  Test 3 — Écart de projection sur l'axe commun
-    Projeter les 4 extrémités sur l'axe unitaire de w1
-    gap = max(0, début_segment_droit − fin_segment_gauche)
-    → gap < gap_thresh (défaut 0.60 m)
+  Test 3 — Projection gap
+    Project all 4 endpoints onto the unit axis of w1
+    gap = max(0, right_segment_start − left_segment_end)
+    → gap < gap_thresh
 ```
 
-**Algorithme 2 — Fusion de murs (merge)**
+### Algorithm 2 — Wall merging
 
-Si les trois tests passent, les deux murs sont remplacés par un seul couvrant la portée totale :
+When collinearity is confirmed, the two walls are replaced by one spanning the full range:
 
 ```
-merge_walls(w1, w2) :
-  Projeter les 4 extrémités sur l'axe unitaire de w1
-  t_min = projection minimale → new_start
-  t_max = projection maximale → new_end
-  new_start = origin_w1 + t_min × unit_vec(w1)
-  new_end   = origin_w1 + t_max × unit_vec(w1)
-  hauteur   = max(h1, h2)
-  épaisseur = max(t1, t2) ou 0.2 m
+merge_walls(w1, w2):
+  Project all 4 endpoints onto the unit axis of w1
+  t_min → new_start = origin_w1 + t_min × unit(w1)
+  t_max → new_end   = origin_w1 + t_max × unit(w1)
+  height    = max(h1, h2)
+  thickness = max(t1, t2)  or 0.2 if both are 0
 ```
 
-La fusion est **itérative** : on recommence jusqu'à ce qu'aucune nouvelle paire colinéaire ne soit trouvée.
+Merging is **iterative** — repeated until no new collinear pairs are found.
+
+### Algorithm 3 — Points-inside-bbox test (Delaunay)
+
+To find the point cloud points actually inside an oriented bounding box:
+
+```
+1. Compute the 8 corners of the bbox in world space:
+     local corners (±l/2, ±w/2, ±h/2) rotated by bbox.rotation around Z
+     then translated to (cx, cy, cz)
+2. hull = Delaunay(8 corners)
+3. mask = hull.find_simplex(points) >= 0
+4. return points[mask]
+```
+
+Delaunay is used as a convex polytope inclusion test, which correctly handles the bbox
+rotation unlike an axis-aligned bounding box check.
+
+### Algorithm 4 — Minimum bounding rectangle (rotating calipers)
+
+To refit a bbox to the actual point cloud points it contains:
+
+```
+fit_min_bbox_2d(points):
+  1. Project points to 2D (drop Z)
+  2. Compute ConvexHull — N edges
+  3. For each edge:
+       a. Define a local frame (axis = edge direction)
+       b. Project all hull points into this frame
+       c. Compute axis-aligned bounding rectangle
+       d. Record area = width × length
+  4. Keep the edge that minimises area
+  → optimal angle, new (cx, cy), length, width
+  Z and height are kept from the original SpatialLM prediction
+```
+
+Complexity O(n log n) dominated by the convex hull step. This is the standard
+**minimum area bounding rectangle** algorithm.
 
 ---
 
-**Algorithme 3 — Test points-dans-bbox 3D (Delaunay)**
+## 7. spatiallm_to_ifc.py
 
-Pour extraire les points du nuage réellement à l'intérieur d'une bounding box orientée :
+Converts a layout TXT file into an IFC4 building model.
 
-```
-bbox_corners_3d(b) :
-  8 coins locaux (±l/2, ±w/2, ±h/2) rotés autour de Z par angle b.rotation
-  + translatés au centre (cx, cy, cz)
-
-points_in_convex_hull(corners, points) :
-  hull = Delaunay(8 coins)
-  mask = hull.find_simplex(points) >= 0
-  → points[mask]
-```
-
-Delaunay est utilisé comme test d'inclusion dans un polytope convexe 3D arbitraire. Plus robuste qu'un AABB car il respecte la rotation de la bbox.
-
----
-
-**Algorithme 4 — Rotating calipers (minimum bounding box 2D)**
-
-Pour réaffiner les dimensions et l'orientation d'une bbox sur les points réels du nuage :
-
-```
-fit_min_bbox_2d(points) :
-  1. Projeter les points en 2D (ignorer Z)
-  2. ConvexHull(points 2D) → N arêtes du hull
-  3. Pour chaque arête du hull :
-       a. Définir un repère local (axe = direction de l'arête)
-       b. Projeter tous les points dans ce repère
-       c. Calculer le rectangle englobant (min/max sur chaque axe)
-       d. Mesurer l'aire = largeur × longueur
-  4. Garder l'arête qui minimise l'aire
-  → angle optimal, nouveau centre (cx, cy), longueur, largeur
-  Z et hauteur conservés depuis SpatialLM
-```
-
-Complexité O(n log n) dominée par le convex hull. C'est l'algorithme standard **minimum area bounding rectangle**.
-
----
-
-### 4. `spatiallm_to_ifc.py` — Génération IFC *(modifié)*
-
-**Rôle :** Convertit le layout TXT raffiné en fichier IFC4 standard.  
-**Dépendances :** ifcopenshell, numpy, scipy.
-
+**Usage**
 ```bash
 python spatiallm_to_ifc.py \
-    --input refined_layout.txt \
-    --output scene.ifc
+  --input refined_layout.txt \
+  --output scene.ifc
 ```
 
-| Argument | Défaut | Description |
-|----------|--------|-------------|
-| `-i` / `--input` | requis | Layout TXT (brut ou raffiné) |
-| `-o` / `--output` | `output.ifc` | Fichier IFC de sortie |
+**Arguments**
 
-**Structure IFC générée :**
+| Argument | Default | Description |
+|---|---|---|
+| `-i` / `--input` | required | Layout TXT (raw or refined) |
+| `-o` / `--output` | `output.ifc` | Output IFC file |
+
+### IFC hierarchy
 
 ```
 IfcProject
   └─ IfcSite
        └─ IfcBuilding
             └─ IfcBuildingStorey  ("Ground Floor")
-                 ├─ IfcSlab           (dalle de sol — convex hull des murs)
-                 ├─ IfcWall           (×N murs)
-                 ├─ IfcDoor           (×N portes)
-                 ├─ IfcWindow         (×N fenêtres)
-                 └─ IfcFurnishingElement  (×N objets Bbox)
+                 ├─ IfcSlab              ← floor slab (convex hull of wall endpoints)
+                 ├─ IfcWall × N
+                 ├─ IfcDoor × N
+                 ├─ IfcWindow × N
+                 └─ IfcFurnishingElement × N
 ```
 
-**Valeurs utilisées dans le IFC :**
+### Geometry — IfcExtrudedAreaSolid
 
-| Élément | Attribut IFC | Source | Remarque |
-|---------|-------------|--------|----------|
-| Mur | longueur | calculée `‖(x2,y2)−(x1,y1)‖` | valeur réelle |
-| Mur | hauteur | `height` du TXT | valeur réelle |
-| Mur | épaisseur | `thickness` du TXT | 0.2 m si TXT = 0.0 |
-| Mur | position | `(x1, y1, z1)` | valeur réelle |
-| Mur | orientation | `atan2(y2−y1, x2−x1)` | valeur réelle |
-| Porte | largeur | `width` du TXT | valeur réelle |
-| Porte | hauteur | `height` du TXT | valeur réelle |
-| Porte | profondeur | épaisseur du mur parent | valeur réelle |
-| Porte | position (bas) | `(cx, cy, cz − height/2)` | valeur réelle |
-| Porte | orientation | direction du mur parent | valeur réelle |
-| Fenêtre | largeur | `width` du TXT | valeur réelle |
-| Fenêtre | hauteur | `height` du TXT | valeur réelle |
-| Fenêtre | profondeur | épaisseur du mur parent | valeur réelle |
-| Fenêtre | position (bas) | `(cx, cy, cz − height/2)` | valeur réelle |
-| Fenêtre | orientation | direction du mur parent | valeur réelle |
-| Bbox | longueur/largeur/hauteur | `length`, `width`, `height` | valeurs réelles |
-| Bbox | position (bas) | `(cx, cy, cz − height/2)` | valeur réelle |
-| Bbox | rotation | `rotation` en radians | valeur réelle |
-| Dalle | polygone | convex hull des extrémités de murs | calculé |
-| Dalle | épaisseur | 0.10 m (fixe) | — |
+All solids are built by the same method: `IfcRectangleProfileDef` extruded vertically with
+`IfcExtrudedAreaSolid`. Dimensions used for each element type:
 
-**Bibliothèques utilisées :**
+| Element | Width (profile X) | Depth (profile Y) | Height (extrusion) |
+|---|---|---|---|
+| Wall | `‖(x2,y2)−(x1,y1)‖` | `thickness` (0.2 m if 0) | `height` |
+| Door | `width` | parent wall thickness | `height` |
+| Window | `width` | parent wall thickness | `height` |
+| Bbox | `length` | `width` | `height` |
+| Slab | convex hull polygon | — | 0.10 m |
 
-| Bibliothèque | Usage dans ce script |
-|---|---|
-| `ifcopenshell` | Création de toutes les entités IFC (géométrie, hiérarchie, relations, GUID) |
-| `numpy` | Construction du tableau de points pour le convex hull de la dalle |
-| `scipy.spatial.ConvexHull` | Polygone du périmètre de la dalle de sol |
-| `math` | `atan2`, `cos`, `sin` pour les orientations de murs et d'objets |
-| `uuid` | Génération des GUID IFC (identifiants uniques de chaque entité) |
+### Geometry — IfcAxis2Placement3D
 
----
+Each element is positioned by a local frame (origin, Z-axis, X-axis):
 
-**Algorithme 1 — Placement local IFC (IfcAxis2Placement3D)**
+| Element | Origin | X-axis |
+|---|---|---|
+| Wall | `(x1, y1, z1)` | `(cos θ, sin θ, 0)` where `θ = atan2(y2−y1, x2−x1)` |
+| Door | `(cx, cy, cz − height/2)` | direction of parent wall |
+| Window | `(cx, cy, cz − height/2)` | direction of parent wall |
+| Bbox | `(cx, cy, cz − height/2)` | `(cos r, sin r, 0)` where `r` = rotation |
+| Slab | `(0, 0, z_min − 0.10)` | `(1, 0, 0)` |
 
-Chaque élément est positionné dans un repère local défini par trois vecteurs :
+The Y-axis is derived implicitly as the cross product Z × X.
+
+### Geometry — Floor slab
 
 ```
-IfcAxis2Placement3D :
-  origine : point 3D de l'élément
-  axe Z   : toujours (0, 0, 1) — vertical mondial
-  axe X   : direction principale de l'élément (horizontal)
-
-Calcul de l'axe X selon le type :
-  Mur     → θ = atan2(y2−y1, x2−x1)  →  (cos θ, sin θ, 0)
-  Porte   → direction du mur parent    →  wall_dir_map[parent]
-  Fenêtre → direction du mur parent    →  wall_dir_map[parent]
-  Bbox    → rotation SpatialLM (rad)   →  (cos r, sin r, 0)
+1. Collect all wall endpoint XY pairs: [(x1,y1), (x2,y2)] for each wall
+2. Compute 2D ConvexHull
+3. Build IfcPolyline from hull vertices (closed)
+4. IfcArbitraryClosedProfileDef(polyline)
+5. Extrude 10 cm downward from z_min − 0.10 m
 ```
 
-L'axe Y est déduit automatiquement par le produit vectoriel Z × X.
+### Wall direction and thickness lookups
 
----
-
-**Algorithme 2 — Géométrie par extrusion (IfcExtrudedAreaSolid)**
-
-Tous les solides sont construits par la même méthode :
-
-```
-1. IfcRectangleProfileDef(largeur, profondeur)
-     → profil rectangulaire 2D centré à l'origine locale
-2. IfcExtrudedAreaSolid(profil, direction=(0,0,1), longueur=hauteur)
-     → extrusion verticale du profil
-3. IfcShapeRepresentation → IfcProductDefinitionShape
-     → représentation géométrique attachée à l'entité IFC
-
-Dimensions utilisées :
-  Mur     : largeur = ‖(x2,y2)−(x1,y1)‖, profondeur = thickness, hauteur = height
-  Porte   : largeur = width, profondeur = épaisseur mur parent, hauteur = height
-  Fenêtre : largeur = width, profondeur = épaisseur mur parent, hauteur = height
-  Bbox    : largeur = length, profondeur = width, hauteur = height
-```
-
----
-
-**Algorithme 3 — Dalle de sol (Convex hull + extrusion)**
-
-```
-1. Collecter tous les points XY des extrémités de murs :
-     pts = [(w.x1, w.y1), (w.x2, w.y2)] pour chaque mur
-2. ConvexHull(pts) → indices des vertices ordonnés
-3. IfcPolyline([p0, p1, ..., pN, p0])  ← fermeture du polygone
-4. IfcArbitraryClosedProfileDef(polyline) → profil polygonal
-5. Extrusion de 10 cm vers le haut
-6. Placement à z = z_min − 0.10 m  ← sous le plancher des murs
-```
-
-Le convex hull garantit que la dalle couvre exactement l'emprise de la pièce quelle que soit sa forme.
-
----
-
-**Algorithme 4 — Direction et épaisseur des murs (lookups)**
-
-Avant de traiter les portes et fenêtres, deux dictionnaires sont construits :
+Before processing doors and windows, two dictionaries are built from the wall list:
 
 ```python
-wall_dir_map[w.name]       = (dx/‖d‖, dy/‖d‖)           # vecteur unitaire
-wall_thickness_map[w.name] = w.thickness if > 0.001 else 0.2
+wall_dir_map[w.name]       = (dx / length, dy / length)  # unit vector
+wall_thickness_map[w.name] = w.thickness if w.thickness > 0.001 else 0.2
 ```
 
-Chaque porte/fenêtre interroge ces dictionnaires via son champ `parent_wall` pour obtenir l'orientation et l'épaisseur correctes de son mur hôte.
+Each door and window references `parent_wall` to retrieve the correct orientation and
+thickness for its host wall.
 
 ---
 
-**Modifications apportées au fichier d'origine :**
+## 8. run_pipeline.py
 
-1. **Dalle de sol automatique** — ajout d'un `IfcSlab` généré par convex hull des extrémités de murs (scipy `ConvexHull`) → `IfcArbitraryClosedProfileDef` extrudé de 10 cm.
+Orchestrates all four pipeline steps in a single command with timing output.
 
-2. **Orientation correcte des portes/fenêtres** — `wall_dir_map` construit depuis les données de murs, utilisé comme axe X local du placement. Avant le fix : axe X toujours `(1,0,0)` → portes perpendiculaires aux murs.
-
-3. **Position verticale correcte des fenêtres** — placement à `cz − height/2` (bas de la fenêtre). Avant le fix : placement à `cz` interprété comme le bas → fenêtres décalées vers le haut.
-
-4. **Profondeur réelle des portes/fenêtres** — `wall_thickness_map` utilisé à la place des valeurs codées en dur (`0.1 m` pour les portes, `0.05 m` pour les fenêtres).
-
-**Limitation connue :** les portes et fenêtres sont des solides positionnés dans le mur, pas des ouvertures réelles. En IFC complet, il faudrait un `IfcOpeningElement` + `IfcRelFillsElement`. Ce niveau de détail nécessiterait une géométrie de découpe que SpatialLM ne fournit pas.
-
----
-
-### 5. `run_pipeline.py` — Orchestrateur CLI *(nouveau)*
-
-**Rôle :** Enchaîne les 4 étapes en une seule commande.
-
+**Usage**
 ```bash
-# Commande minimale
-python run_pipeline.py --input raw_scan.ply --output scene.ifc
+# Minimal
+python run_pipeline.py --input scan.ply --output model.ifc
 
-# Commande complète
+# Full
 python run_pipeline.py \
-    --input  raw_scan.ply \
-    --output scene.ifc \
-    --workdir /tmp/pipeline \
-    --model  manycore-research/SpatialLM1.1-Qwen-0.5B \
-    --detect_type all \
-    --preprocess_mode moderate \
-    --target_height 2.5 \
-    --skip_preprocess \
-    --skip_postprocess \
-    --inference_python /path/to/spatiallm-env/bin/python
+  --input  scan.ply \
+  --output model.ifc \
+  --workdir /tmp/pipeline \
+  --model  manycore-research/SpatialLM1.1-Qwen-0.5B \
+  --detect_type all \
+  --seed 42 \
+  --preprocess_mode moderate \
+  --target_height 2.5 \
+  --skip_preprocess \
+  --skip_postprocess \
+  --inference_python /opt/conda/envs/spatiallm/bin/python
 ```
 
-| Argument | Défaut | Description |
-|----------|--------|-------------|
-| `--input` / `-i` | requis | Fichier `.ply` brut |
-| `--output` / `-o` | `<stem>.ifc` | Fichier IFC de sortie |
-| `--workdir` / `-w` | dossier de `--input` | Dossier pour les fichiers intermédiaires |
-| `--model` / `-m` | `SpatialLM-Llama-1B` | Modèle SpatialLM |
-| `--detect_type` | `all` | Type de détection |
-| `--preprocess_mode` | `moderate` | Mode de nettoyage |
-| `--target_height` | `2.5` | Hauteur cible du plafond |
-| `--skip_preprocess` | False | Utiliser le `.ply` tel quel |
-| `--skip_postprocess` | False | Sauter la correction géométrique |
-| `--inference_python` | `sys.executable` | Interpréteur Python alternatif pour l'inférence |
-| `--angle_thresh` | `10.0°` | Seuil fusion murs |
-| `--dist_thresh` | `0.35 m` | Seuil distance murs |
-| `--gap_thresh` | `0.60 m` | Seuil espace murs |
-| `--min_points` | `50` | Points min pour raffinage bbox |
+**All arguments**
 
-**Fichiers intermédiaires produits :**
+| Argument | Default | Description |
+|---|---|---|
+| `--input` / `-i` | required | Raw `.ply` point cloud |
+| `--output` / `-o` | `<stem>.ifc` | Output IFC file |
+| `--workdir` / `-w` | input directory | Folder for intermediate files |
+| `--model` / `-m` | `SpatialLM-Llama-1B` | Model name or local path |
+| `--detect_type` | `all` | `all` / `arch` / `object` |
+| `--seed` | `42` | Inference seed for reproducibility |
+| `--preprocess_mode` | `moderate` | Denoising intensity |
+| `--target_height` | `2.5` | Expected ceiling height in metres |
+| `--skip_preprocess` | off | Use raw input directly |
+| `--skip_postprocess` | off | Skip geometric correction |
+| `--inference_python` | `sys.executable` | Alternate Python interpreter for inference step |
+| `--angle_thresh` | `10.0°` | Wall merge angle threshold |
+| `--dist_thresh` | `0.35 m` | Wall merge distance threshold |
+| `--gap_thresh` | `0.60 m` | Wall merge gap threshold |
+| `--min_points` | `50` | Min points for bbox refitting |
+
+**Intermediate files produced**
 
 ```
 <workdir>/
-  <stem>_clean.ply            ← nuage nettoyé
-  <stem>_raw_layout.txt       ← layout brut SpatialLM
-  <stem>_refined_layout.txt   ← layout corrigé
-<output>                      ← fichier IFC final
+  <stem>_clean.ply           ← cleaned point cloud
+  <stem>_raw_layout.txt      ← raw SpatialLM output
+  <stem>_refined_layout.txt  ← geometrically corrected layout
+<output>.ifc                 ← final BIM file
 ```
 
-**Note sur les environnements :** l'inférence SpatialLM nécessite PyTorch + Transformers.  
-Si ces dépendances sont dans un conda séparé :
+**Using a separate conda environment for inference**
+
+If SpatialLM dependencies (torch, transformers) live in a different environment:
+
 ```bash
 python run_pipeline.py --input scan.ply \
-    --inference_python /opt/conda/envs/spatiallm/bin/python
+  --inference_python /opt/conda/envs/spatiallm/bin/python
 ```
 
 ---
 
-### 6. `pipeline_gui.py` — Interface graphique *(nouveau)*
+## 9. pipeline_gui.py
 
-**Rôle :** Interface Streamlit pour exécuter le pipeline complet sans ligne de commande.
+Browser-based Streamlit interface covering the full pipeline.
 
+**Launch**
 ```bash
-cd /mnt/c/Users/hboutabb/SpatialLM
 streamlit run pipeline_gui.py
-# → ouvrir http://localhost:8501 dans le navigateur Windows
+# Open http://localhost:8501
 ```
 
-**Fonctionnalités :**
+**Features**
 
-- Upload du `.ply` par glisser-déposer
-- Contrôle de chaque étape via la sidebar (avec option de les ignorer)
-- Log en temps réel de chaque script pendant l'exécution
-- Comparaison layout brut vs raffiné (comptage des éléments avec deltas)
-- Maquette 3D interactive (Plotly) avec sol, murs, portes, fenêtres et objets
-- Viewer Rerun embarqué pour le nuage de points + détections
-- Téléchargements : PLY nettoyé, layout TXT brut, layout TXT raffiné, fichier IFC
+- Drag-and-drop `.ply` upload
+- Sidebar controls for every pipeline parameter
+- Live log streaming for each script during execution
+- Side-by-side comparison of raw vs refined layout (element counts and deltas)
+- Interactive 3D maquette (Plotly): floor polygon with Delaunay triangulation, filled walls,
+  door/window panels, semi-transparent furniture boxes with floating category labels
+- Embedded Rerun viewer (launched on demand) for the raw point cloud + detected layout
+- Download buttons: cleaned PLY · raw layout TXT · refined layout TXT · IFC file
 
-**Paramètres disponibles dans la sidebar :**
+**Sidebar sections**
 
-| Section | Paramètre |
-|---------|-----------|
-| Preprocessing | Mode (Complet / Alignement uniquement / Ignorer), nettoyage, cluster, couleurs, hauteur cible |
-| Inférence | Modèle (Llama 1B / Qwen 0.5B), type de détection, seed |
-| Post-processing | Ignorer / activer, seuils (angle, distance, espace, points min) |
-| IFC | Ignorer / activer |
-
----
-
-### 7. `spatiallm_gui.py` — Interface graphique originale
-
-**Fichier d'origine — non modifié.**  
-Interface 3 étapes : Preprocessing → Inférence → Visualisation RRD.  
-Remplacé fonctionnellement par `pipeline_gui.py` qui ajoute post-processing + IFC.
+| Section | Controls |
+|---|---|
+| Preprocessing | Mode (full / alignment-only / skip), denoising, largest cluster, colours, target height |
+| Inference | Model (Llama 1B / Qwen 0.5B), detection type, seed |
+| Post-processing | Enable/skip, angle threshold, distance threshold, gap threshold, min points |
+| IFC | Enable/skip |
 
 ---
 
-## Corrections et bugs résolus
+## 10. Docker
 
-### Bug 1 — Portes et fenêtres perpendiculaires aux murs
+The `Dockerfile` and `docker-compose.yml` package the entire stack into a portable GPU image.
 
-**Symptôme :** dans le viewer IFC, les portes et fenêtres étaient orientées à 90° par rapport à leur mur.
-
-**Cause :** l'axe X du placement local était toujours `(1, 0, 0)` (direction globale X), indépendamment de l'orientation réelle du mur.
-
-**Fix :**
-```python
-# Construction du dictionnaire direction de mur
-wall_dir_map[w.name] = (dx/ln, dy/ln)  # vecteur normalisé
-
-# Utilisation pour chaque porte/fenêtre
-dir_x, dir_y = wall_dir_map.get(d.parent_wall, (1.0, 0.0))
-placement = IfcAxis2Placement3D(
-    origin=(cx, cy, cz),
-    z_axis=(0,0,1),
-    x_axis=(dir_x, dir_y, 0.0),   # ← direction réelle du mur
-)
-```
-
----
-
-### Bug 2 — Fenêtres décalées vers le haut
-
-**Symptôme :** les fenêtres dépassaient le haut des murs.
-
-**Cause :** SpatialLM donne `cz` comme le **centre** de la fenêtre, mais le script plaçait le **bas** à `cz` sans correction.
-
-**Fix :**
-```python
-# Avant
-model.createIfcCartesianPoint((wn.cx, wn.cy, wn.cz))
-
-# Après
-model.createIfcCartesianPoint((wn.cx, wn.cy, wn.cz - wn.height / 2))
-```
-
-**Exemple :** `window_0` avec `cz=1.55m`, `height=1.02m`, mur top à `2.39m` :
-- Avant fix : fenêtre de `1.55m` à `2.57m` → dépasse de 18 cm
-- Après fix : fenêtre de `1.04m` à `2.06m` → dans le mur
-
----
-
-### Bug 3 — Profondeur des portes/fenêtres incorrecte
-
-**Symptôme :** portes et fenêtres trop fines (5–10 cm) au lieu de l'épaisseur réelle du mur.
-
-**Cause :** profondeur codée en dur (`0.1 m` pour portes, `0.05 m` pour fenêtres).
-
-**Fix :**
-```python
-wall_thickness_map[w.name] = w.thickness if w.thickness > 0.001 else 0.2
-
-# Utilisation
-wall_t = wall_thickness_map.get(d.parent_wall, 0.2)
-profile = IfcRectangleProfileDef(width=d.width, depth=wall_t)
-```
-
----
-
-## Dépendances
-
-| Bibliothèque | Version | Rôle |
-|-------------|---------|------|
-| `torch` + `transformers` | selon HF | Modèle SpatialLM (inférence) |
-| `open3d` | ≥ 0.19 | Lecture PLY, débruitage, visualisation |
-| `numpy` | ≥ 2.3 | Calculs géométriques |
-| `scipy` | ≥ 1.16 | ConvexHull, Delaunay, rotating calipers |
-| `ifcopenshell` | ≥ 0.8.5 | Génération IFC |
-| `streamlit` | ≥ 1.3 | Interface graphique |
-| `plotly` | ≥ 5.0 | Maquette 3D dans l'interface |
-| `rerun-sdk` | ≥ 0.15 | Viewer nuage de points |
-
-**Environnement recommandé :** Python 3.12 (open3d ne supporte pas Python 3.13+).
-
+**Build**
 ```bash
-conda create -n spatiallm python=3.12
-conda activate spatiallm
-pip install -e .   # dans le dossier pystruct3d si utilisé
-pip install ifcopenshell streamlit plotly rerun-sdk
+docker compose build
 ```
 
----
+The first build takes 20–40 minutes because flash-attn compiles from source. Subsequent
+builds are fast — the poetry dependency layer is cached and only re-runs when
+`pyproject.toml` or `poetry.lock` changes.
 
-## Chemins configurés
-
-| Variable | Valeur |
-|----------|--------|
-| Dossier SpatialLM | `/mnt/c/Users/hboutabb/SpatialLM` |
-| Dossier scans | `C:\Users\hboutabb\scanbureau\` |
-| Modèle Llama 1B | `/mnt/c/Users/hboutabb/SpatialLM1.1-Llama-1B` |
-| Modèle Qwen 0.5B | `/mnt/c/Users/hboutabb/SpatialLM1.1-Qwen-0.5B` |
-
----
-
-## Exemple de session complète
-
+**Run — Streamlit GUI**
 ```bash
-# 1. Lancer l'interface graphique
-cd /mnt/c/Users/hboutabb/SpatialLM
-streamlit run pipeline_gui.py
-
-# OU en ligne de commande :
-
-# 1. Nettoyage
-python preprocess_for_spatiallm.py \
-    -i /mnt/c/Users/hboutabb/scanbureau/scan_brut.ply \
-    -o /mnt/c/Users/hboutabb/scanbureau/scan_clean.ply \
-    --mode moderate --target_height 2.5 --keep_largest_cluster
-
-# 2. Inférence SpatialLM
-python inference.py \
-    -p /mnt/c/Users/hboutabb/scanbureau/scan_clean.ply \
-    -o /mnt/c/Users/hboutabb/scanbureau/layout_raw.txt \
-    --model_path /mnt/c/Users/hboutabb/SpatialLM1.1-Llama-1B
-
-# 3. Correction géométrique
-python postprocess.py \
-    --layout  /mnt/c/Users/hboutabb/scanbureau/layout_raw.txt \
-    --point_cloud /mnt/c/Users/hboutabb/scanbureau/scan_clean.ply \
-    --output  /mnt/c/Users/hboutabb/scanbureau/layout_refined.txt
-
-# 4. Génération IFC
-python spatiallm_to_ifc.py \
-    --input  /mnt/c/Users/hboutabb/scanbureau/layout_refined.txt \
-    --output /mnt/c/Users/hboutabb/scanbureau/scene.ifc
-
-# OU tout en une commande :
-python run_pipeline.py \
-    --input  /mnt/c/Users/hboutabb/scanbureau/scan_brut.ply \
-    --output /mnt/c/Users/hboutabb/scanbureau/scene.ifc
+docker compose up
+# Open http://localhost:8501
 ```
+
+**Run — CLI pipeline**
+```bash
+docker compose run spatiallm python run_pipeline.py \
+  --input /app/data/scan.ply \
+  --output /app/output/model.ifc \
+  --model manycore-research/SpatialLM1.1-Qwen-0.5B
+```
+
+**Volume mounts**
+
+| Mount | Purpose |
+|---|---|
+| `./data:/app/data` | Input `.ply` files (bind mount from host) |
+| `./output:/app/output` | Generated IFC and intermediate files |
+| `hf_cache:/root/.cache/huggingface` | HuggingFace model cache (named volume, persists across runs) |
+
+Model weights are downloaded on first run and cached in the named volume — they are not
+baked into the image.
+
+**Requirements on the host**
+
+- Docker Engine
+- NVIDIA driver
+- [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+
+---
+
+## 11. IFC output structure
+
+The generated `.ifc` file uses the IFC4 schema and can be opened in any conformant BIM
+viewer: BlenderBIM, FreeCAD, ArchiCAD, Revit, Solibri, etc.
+
+**Hierarchy:**
+```
+IfcProject  "Indoor3D Project"
+  IfcSite  "Site"
+    IfcBuilding  "Building"
+      IfcBuildingStorey  "Ground Floor"
+        IfcSlab          (floor slab — convex hull footprint, 10 cm thick)
+        IfcWall × N      (one per wall segment)
+        IfcDoor × N      (one per detected door)
+        IfcWindow × N    (one per detected window)
+        IfcFurnishingElement × N  (one per Bbox — labelled with furniture category)
+```
+
+All elements are placed using `IfcLocalPlacement` relative to the building storey origin.
+Geometry is `IfcExtrudedAreaSolid` throughout. Each element carries a unique GUID generated
+at conversion time.
+
+---
+
+## 12. Known limitations
+
+**Doors and windows are solids, not openings.**
+IFC correctly distinguishes openings (`IfcOpeningElement`) from the elements that fill them
+(`IfcRelFillsElement`). This pipeline places door and window solids inside walls but does
+not cut holes. Proper openings require wall geometry subtraction, which SpatialLM does not
+provide. Structural analysis tools that rely on wall continuity will not see correct results.
+
+**Wall thickness defaults to 0.2 m when SpatialLM predicts 0.0.**
+SpatialLM does not always predict wall thickness reliably. The fallback (0.2 m) is a
+reasonable approximation for residential construction but may differ from reality.
+
+**Single floor / single room.**
+`run_pipeline.py` processes one `.ply` at a time and generates a single `IfcBuildingStorey`.
+Multi-room or multi-floor merging is not yet implemented.
+
+**Flash Attention is disabled on pre-Ampere GPUs (CC < 8.0).**
+The Sonata encoder detects GPU compute capability at startup and falls back to standard
+attention automatically. Inference is slightly slower on these devices but functionally
+identical.
+
+**Inference is deterministic but model-quality-limited.**
+With `do_sample=False` and a fixed seed, results are fully reproducible. Layout quality
+depends entirely on SpatialLM's predictions — post-processing corrects common geometric
+errors but cannot recover missing walls or misdetected elements.
