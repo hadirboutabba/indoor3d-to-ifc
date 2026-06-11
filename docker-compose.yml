@@ -1,0 +1,23 @@
+services:
+  spatiallm:
+    build: .
+    image: indoor3d-to-ifc:latest
+    runtime: nvidia                   # requires nvidia-container-toolkit on host
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    ports:
+      - "8501:8501"                   # Streamlit GUI
+    volumes:
+      - ./data:/app/data              # your .ply input files
+      - ./output:/app/output          # generated .ifc / layout files
+      - hf_cache:/root/.cache/huggingface  # HuggingFace model cache (persists across runs)
+    # Uncomment to run CLI pipeline instead of GUI:
+    # command: >
+    #   python run_pipeline.py
+    #   --input /app/data/your_scan.ply
+    #   --output /app/output/result.ifc
+    #   --model manycore-research/SpatialLM1.1-Qwen-0.5B
+
+volumes:
+  hf_cache:   # named volume so model weights are downloaded once and reused
