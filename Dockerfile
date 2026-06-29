@@ -49,6 +49,8 @@ RUN pip install --no-cache-dir torch-scatter \
         -f https://data.pyg.org/whl/torch-2.4.0+cu124.html
 RUN pip install --no-cache-dir timm spconv-cu120
 
+# ── IfcOpenShell ───────────────────────────────────────────────────────────────
+RUN pip install --no-cache-dir ifcopenshell
 # ── Flash Attention: optional, requires CC 8.0+ (Ampere or newer) ─────────────
 # On Turing GPUs (CC 7.5 — RTX 2070 Super / 2080 Ti) this either fails to build
 # or produces a binary that can't be used at runtime. The Sonata encoder falls

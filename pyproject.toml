@@ -31,6 +31,7 @@ nvidia-nccl-cu12 = "*"
 poethepoet = { extras = ["poetry-plugin"], version = "^0.33.1" }
 addict = "^2.4.0"
 streamlit = "^1.58.0"
+ifcopenshell = "^0.8.5"
 
 [tool.poe.tasks]
 install-torchsparse = "pip install git+https://github.com/mit-han-lab/torchsparse.git"

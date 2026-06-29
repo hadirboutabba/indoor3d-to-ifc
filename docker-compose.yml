@@ -1,12 +1,13 @@
 services:
   spatiallm:
-    build: .
-    image: indoor3d-to-ifc:latest
+    #build: .
+    image: hadirboutabba/indoor3d-to-ifc:latest
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     ports:
       - "8501:8501"                   # Streamlit GUI
+      - "9090:9090"   # Rerun WebViewer
     volumes:
       - ./data:/app/data              # your .ply input files
       - ./output:/app/output          # generated .ifc / layout files

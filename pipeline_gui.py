@@ -10,7 +10,7 @@ Workflow :
   + Visualisation 3D maquette embarquée + viewer Rerun
 
 Lancement :
-    cd /mnt/c/Users/hboutabb/SpatialLM
+    cd /app
     streamlit run pipeline_gui.py
 """
 

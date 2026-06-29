@@ -1060,6 +1060,53 @@ files = [
 all = ["mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
 
 [[package]]
+name = "ifcopenshell"
+version = "0.8.5"
+description = "Python bindings, utility functions, and high-level API for IfcOpenShell"
+optional = false
+python-versions = "<3.15,>=3.10"
+groups = ["main"]
+files = [
+    {file = "ifcopenshell-0.8.5-py310-none-macosx_10_15_x86_64.whl", hash = "sha256:3b1c5a2ea655d96914ddafd258aa6183f29fb7a08b2b10a329b204b8deca7226"},
+    {file = "ifcopenshell-0.8.5-py310-none-macosx_11_0_arm64.whl", hash = "sha256:beb9e761ea9b6678c5edff4d6ab31e40a771fffca3bc295810045de564f1b018"},
+    {file = "ifcopenshell-0.8.5-py310-none-manylinux_2_31_aarch64.whl", hash = "sha256:8de53ba37e762f2e2ba7cf502f15504b886233f681c30245ae7b4ed82087445d"},
+    {file = "ifcopenshell-0.8.5-py310-none-manylinux_2_31_x86_64.whl", hash = "sha256:487189a6a70f9c688ae58efa075312d0dbba3e83839abaafbfe669bbfdb66e2a"},
+    {file = "ifcopenshell-0.8.5-py310-none-win_amd64.whl", hash = "sha256:86b60a3fba3c5b3c5a152a71b1a5038a78384fcaa0bab61297bf363c8bedd325"},
+    {file = "ifcopenshell-0.8.5-py311-none-macosx_10_15_x86_64.whl", hash = "sha256:ba916b73a1dd011abeee564b2bb0027c3dc679d77733d44f2f38009b70d413b5"},
+    {file = "ifcopenshell-0.8.5-py311-none-macosx_11_0_arm64.whl", hash = "sha256:7dba9a0348600bd59ceb9222333e493b9b1c49fc69251a73bc707e77a445007d"},
+    {file = "ifcopenshell-0.8.5-py311-none-manylinux_2_31_aarch64.whl", hash = "sha256:e568a859b489ba43013795c3d682758d1ee905fe08919d2c96b5c5676167b243"},
+    {file = "ifcopenshell-0.8.5-py311-none-manylinux_2_31_x86_64.whl", hash = "sha256:612e955ab0975bbc4134fe26c4c36d71a12525fd5c4b391573e6df3cd81713ec"},
+    {file = "ifcopenshell-0.8.5-py311-none-win_amd64.whl", hash = "sha256:a994cb398aa822b0153ace11fc19deea108706d3a10339de9ac9dc13da21076d"},
+    {file = "ifcopenshell-0.8.5-py312-none-macosx_10_15_x86_64.whl", hash = "sha256:38f63e13cf326b195e2b9ac4ed45396cdda9b3ad29318ce04d7c4a401f7a3921"},
+    {file = "ifcopenshell-0.8.5-py312-none-macosx_11_0_arm64.whl", hash = "sha256:89e60dbe8ea7014174ab332b6caad25465c446c118a896435f594ab24602a10a"},
+    {file = "ifcopenshell-0.8.5-py312-none-manylinux_2_31_aarch64.whl", hash = "sha256:a5183ae0431a9b87d89ca2e880dae986e4140f088293c3872a88ed3177e7308d"},
+    {file = "ifcopenshell-0.8.5-py312-none-manylinux_2_31_x86_64.whl", hash = "sha256:dd154b121815e25bc4890f030bf2bdd8d99b059448e0d1205ac81388a3d321f4"},
+    {file = "ifcopenshell-0.8.5-py312-none-win_amd64.whl", hash = "sha256:7927921dbfd18024f44780880c37e48460bbca7476da3b0c2607e044b31521d5"},
+    {file = "ifcopenshell-0.8.5-py313-none-macosx_10_15_x86_64.whl", hash = "sha256:f8abac2bd3a3eb11009beb290834d8a5a2330d59a8600dede0faf7ddf8a8f16f"},
+    {file = "ifcopenshell-0.8.5-py313-none-macosx_11_0_arm64.whl", hash = "sha256:9444ed9b924eaa76037653c56261098846bffa2f4732eefa8b83687163addecd"},
+    {file = "ifcopenshell-0.8.5-py313-none-manylinux_2_31_aarch64.whl", hash = "sha256:233e2afd81456ac278f2dd21360c509999498d0b8dc207230eb05e3063f87860"},
+    {file = "ifcopenshell-0.8.5-py313-none-manylinux_2_31_x86_64.whl", hash = "sha256:c03c47abbfd0afddcbc91b510d984d7c017a222877460da5e0a6496d89f185e4"},
+    {file = "ifcopenshell-0.8.5-py313-none-win_amd64.whl", hash = "sha256:6dd40d29b21d1c92104a4585a1ee6a31811305b68f5e3f7ee991f89f4d386366"},
+    {file = "ifcopenshell-0.8.5-py314-none-macosx_10_15_x86_64.whl", hash = "sha256:f9e35e2df5397c795b320421192fcdb006573d1b36524f420d2474a4f9d842cf"},
+    {file = "ifcopenshell-0.8.5-py314-none-macosx_11_0_arm64.whl", hash = "sha256:8cf1f7fd49367aeba75eb56682f1454b2f353a979c6111a165bc05bc62148600"},
+    {file = "ifcopenshell-0.8.5-py314-none-manylinux_2_31_aarch64.whl", hash = "sha256:005dced5aaa45064e73287c75ed9cf5f8ba54bce80c496fd76404313833cd62e"},
+    {file = "ifcopenshell-0.8.5-py314-none-manylinux_2_31_x86_64.whl", hash = "sha256:15b488347efce0d7f5ab5b6d5561cf30428353b6ee8c7c8a53724f4b10ad4ac6"},
+    {file = "ifcopenshell-0.8.5-py314-none-win_amd64.whl", hash = "sha256:13a5992dc07e69c0c78df5479e1ff9635e6ce9fa70c841d9ce2931e8481eabb9"},
+]
+
+[package.dependencies]
+isodate = "*"
+lark = "*"
+numpy = "*"
+python-dateutil = "*"
+shapely = "*"
+typing-extensions = "*"
+
+[package.extras]
+advanced = ["networkx"]
+dev = ["pytest", "tabulate"]
+
+[[package]]
 name = "importlib-metadata"
 version = "9.0.0"
 description = "Read metadata from Python packages"
@@ -1093,6 +1140,18 @@ groups = ["main"]
 files = [
     {file = "installer-0.7.0-py3-none-any.whl", hash = "sha256:05d1933f0a5ba7d8d6296bb6d5018e7c94fa473ceb10cf198a92ccea19c27b53"},
     {file = "installer-0.7.0.tar.gz", hash = "sha256:a26d3e3116289bb08216e0d0f7d925fcef0b0194eedfa0c944bcaaa106c4b631"},
+]
+
+[[package]]
+name = "isodate"
+version = "0.7.2"
+description = "An ISO 8601 date/time/duration parser and formatter"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "isodate-0.7.2-py3-none-any.whl", hash = "sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15"},
+    {file = "isodate-0.7.2.tar.gz", hash = "sha256:4cd1aa0f43ca76f4a6c6c0292a85f40b35ec2e43e315b59f06e6d32171a953e6"},
 ]
 
 [[package]]
@@ -1305,6 +1364,24 @@ doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linke
 enabler = ["pytest-enabler (>=3.4)"]
 test = ["pyfakefs", "pytest (>=6,!=8.1.*)"]
 type = ["pygobject-stubs", "pytest-mypy (>=1.0.1)", "shtab", "types-pywin32"]
+
+[[package]]
+name = "lark"
+version = "1.3.1"
+description = "a modern parsing library"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "lark-1.3.1-py3-none-any.whl", hash = "sha256:c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12"},
+    {file = "lark-1.3.1.tar.gz", hash = "sha256:b426a7a6d6d53189d318f2b6236ab5d6429eaf09259f1ca33eb716eed10d2905"},
+]
+
+[package.extras]
+atomic-cache = ["atomicwrites"]
+interegular = ["interegular (>=0.3.1,<0.4.0)"]
+nearley = ["js2py"]
+regex = ["regex"]
 
 [[package]]
 name = "markupsafe"
@@ -4532,4 +4609,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<=3.12"
-content-hash = "9f5a4f88af23bb71108887dd105e7bc13b9943f8ea7551be55d3679c0a651f07"
+content-hash = "29199bd677ba7fc155b81cbebebc340a8e7523d2f069cf2c2ed6667ec4005d94"
