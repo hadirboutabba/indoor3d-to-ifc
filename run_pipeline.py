@@ -93,7 +93,7 @@ def main():
 
     # ── Étape 2 : inférence SpatialLM ──
     p.add_argument("--model", "-m",
-                   default="manycore-research/SpatialLM-Llama-1B",
+                   default="manycore-research/SpatialLM1.1-Llama-1B",
                    help="Chemin ou nom HuggingFace du modèle SpatialLM")
     p.add_argument("--detect_type",
                    choices=["all", "arch", "object"], default="all",

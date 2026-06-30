@@ -165,7 +165,7 @@ python inference.py \
 |---|---|---|
 | `-p` / `--point_cloud` | required | Input `.ply` file or folder of `.ply` files |
 | `-o` / `--output` | required | Output layout `.txt` file or folder |
-| `-m` / `--model_path` | `SpatialLM-Llama-1B` | HuggingFace model name or local path |
+| `-m` / `--model_path` | `SpatialLM1.1-Llama-1B` | HuggingFace model name or local path |
 | `-d` / `--detect_type` | `all` | `all` / `arch` (walls+openings) / `object` (furniture) |
 | `-c` / `--category` | all 59 | Subset of furniture categories (see full list below) |
 | `--repetition_penalty` | `1.1` | Penalises repeated tokens; values >1.0 reduce loops |
@@ -414,7 +414,7 @@ python run_pipeline.py \
 | `--input` / `-i` | required | Raw `.ply` point cloud |
 | `--output` / `-o` | `<stem>.ifc` | Output IFC file |
 | `--workdir` / `-w` | input directory | Folder for intermediate files |
-| `--model` / `-m` | `SpatialLM-Llama-1B` | Model name or local path |
+| `--model` / `-m` | `SpatialLM1.1-Llama-1B` | Model name or local path |
 | `--detect_type` | `all` | `all` / `arch` / `object` |
 | `--seed` | `42` | Inference seed for reproducibility |
 | `--preprocess_mode` | `moderate` | Denoising intensity |

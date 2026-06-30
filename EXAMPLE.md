@@ -24,6 +24,8 @@ colors.append(color)
 
 ## 2. Align the output point cloud
 
+> **Tip:** Steps 2 and 3 (alignment + scaling) can be automated with `preprocess_for_spatiallm.py` from this project. See the [README](./README.md#usage) for details. The manual approach below is useful when you need more control or are using a different preprocessing workflow.
+
 In the current version of SpatialLM, input point clouds are considered axis-aligned where the z-axis is the up axis. The input point clouds should follow the ScanNet scenes orientation convension, which is "_Transforms scans to z-up alignment for scans and tries to align walls to x-y planes._" in [Alignment](https://github.com/ScanNet/ScanNet/tree/master/Alignment). Refer to [Issue #7](https://github.com/manycore-research/SpatialLM/issues/7) for more details.
 
 For now, you can choose your way to align the point cloud. We recommend you to check out [VanishingPoint Estimation](https://github.com/yanconglin/VanishingPoint_HoughTransform_GaussianSphere), [Manhattan Frame Estimation from video](https://github.com/jstraub/rtmf), Manhattan Frame Estimation from surface normals (ref paper: Globally Optimal Manhattan Frame Estimation in Real-time, Manhattan World Inference in the Space of Surface Normals) for estimating the Manhattan Frame from image, video or point cloud. And more recent methods such as [U-ARE-ME](https://github.com/callum-rhodes/U-ARE-ME), [Perspective Fields for Single Image Camera Calibration](https://github.com/jinlinyi/PerspectiveFields). Or even use tools like Blender to manually align the point cloud.
@@ -65,7 +67,7 @@ You can also explore more creative approaches to estimate the scale of the point
 Now we can run the layout estimation with the aligned and scaled point cloud.
 
 ```bash
-python inference.py --point_cloud scaled_point_cloud.ply --output replica_layout.txt --model_path manycore-research/SpatialLM-Llama-1B
+python inference.py --point_cloud scaled_point_cloud.ply --output replica_layout.txt --model_path manycore-research/SpatialLM1.1-Llama-1B
 # visualize the layout
 python visualize.py --point_cloud scaled_point_cloud.ply --layout replica_layout.txt --save replica_layout.rrd
 rerun replica_layout.rrd

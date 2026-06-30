@@ -138,7 +138,7 @@ python run_pipeline.py \
 | `--input` / `-i` | required | Raw `.ply` point cloud |
 | `--output` / `-o` | `<stem>.ifc` | Output IFC file |
 | `--workdir` / `-w` | input directory | Folder for intermediate files |
-| `--model` / `-m` | `SpatialLM-Llama-1B` | HuggingFace model name or local path |
+| `--model` / `-m` | `SpatialLM1.1-Llama-1B` | HuggingFace model name or local path |
 | `--detect_type` | `all` | `all` / `arch` (walls+openings) / `object` (furniture only) |
 | `--seed` | `42` | Random seed for reproducible inference |
 | `--preprocess_mode` | `moderate` | `conservative` / `moderate` / `aggressive` |
