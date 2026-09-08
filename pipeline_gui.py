@@ -35,11 +35,14 @@ except ImportError:
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-SPATIALLM_DIR  = "/app"
+SPATIALLM_DIR  = os.path.dirname(os.path.abspath(__file__))
 RERUN_WEB_PORT = 9090
+
 MODELS = {
-    "SpatialLM1.1 — Llama 1B  (recommandé, précis)":  "manycore-research/SpatialLM1.1-Llama-1B",
-    "SpatialLM1.1 — Qwen 0.5B (rapide, léger)":       "manycore-research/SpatialLM1.1-Qwen-0.5B",
+    "SpatialLM1.1 — Llama 1B  (recommandé, précis)":  "/mnt/c/Users/hboutabb/SpatialLM1.1-Llama-1B",
+    "SpatialLM1.1 — Qwen 0.5B (rapide, léger)":       "/mnt/c/Users/hboutabb/SpatialLM1.1-Qwen-0.5B",
+   # "SpatialLM1.1 — Llama 1B  (recommandé, précis)":  "manycore-research/SpatialLM1.1-Llama-1B",
+   # "SpatialLM1.1 — Qwen 0.5B (rapide, léger)":       "manycore-research/SpatialLM1.1-Qwen-0.5B",
 }
 
 

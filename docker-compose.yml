@@ -1,7 +1,7 @@
 services:
   spatiallm:
     #build: .
-    image: hadirboutabba/indoor3d-to-ifc:latest
+    image: hadirboutabba/indoor3d-to-ifc:small
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -17,7 +17,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
     # Uncomment to run CLI pipeline instead of GUI:
     # command: >

@@ -1,10 +1,10 @@
 """
-spatiallm_to_ifc.py
---------------------
-Convertit la sortie TXT de SpatialLM en fichier IFC standard.
+spatiallm_to_ifc_with_voids.py
+-------------------------------
+Convertit la sortie TXT de SpatialLM en fichier IFC standard avec vides sémantiques.
 
 Usage:
-    python spatiallm_to_ifc.py --input scene.txt --output scene.ifc
+    python spatiallm_to_ifc_with_voids.py --input scene.txt --output scene.ifc
 
 Format d'entrée attendu (SpatialLM):
     wall_0=Wall(x1,y1,z1, x2,y2,z2, height, thickness)
@@ -13,21 +13,19 @@ Format d'entrée attendu (SpatialLM):
     bbox_0=Bbox(class, cx,cy,cz, rotation, l,w,h)
 
 Dépendances:
-    pip install ifcopenshell numpy
+    pip install ifcopenshell numpy scipy
 """
 
 import argparse
 import math
 import re
 import uuid
-from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from typing import List, Tuple
 import numpy as np
 
 try:
     import ifcopenshell
-    import ifcopenshell.api
-    import ifcopenshell.util.element
 except ImportError:
     print("ERROR: ifcopenshell non installé. Lancer: pip install ifcopenshell")
     raise
@@ -84,8 +82,7 @@ def parse_spatiallm_txt(filepath: str):
                 continue
 
             # Wall
-            m = re.match(
-                r"(wall_\w+)=Wall\(([^)]+)\)", line)
+            m = re.match(r"(wall_\w+)=Wall\(([^)]+)\)", line)
             if m:
                 name = m.group(1)
                 vals = [float(v) for v in m.group(2).split(",")]
@@ -93,8 +90,7 @@ def parse_spatiallm_txt(filepath: str):
                 continue
 
             # Door
-            m = re.match(
-                r"(door_\w+)=Door\((\w+),([^)]+)\)", line)
+            m = re.match(r"(door_\w+)=Door\((\w+),([^)]+)\)", line)
             if m:
                 name = m.group(1)
                 parent = m.group(2)
@@ -103,8 +99,7 @@ def parse_spatiallm_txt(filepath: str):
                 continue
 
             # Window
-            m = re.match(
-                r"(window_\w+)=Window\((\w+),([^)]+)\)", line)
+            m = re.match(r"(window_\w+)=Window\((\w+),([^)]+)\)", line)
             if m:
                 name = m.group(1)
                 parent = m.group(2)
@@ -113,8 +108,7 @@ def parse_spatiallm_txt(filepath: str):
                 continue
 
             # Bbox
-            m = re.match(
-                r"(bbox_\w+)=Bbox\((\w+),([^)]+)\)", line)
+            m = re.match(r"(bbox_\w+)=Bbox\((\w+),([^)]+)\)", line)
             if m:
                 name = m.group(1)
                 cls = m.group(2)
@@ -134,11 +128,6 @@ def parse_spatiallm_txt(filepath: str):
 def wall_length(w: WallData) -> float:
     return math.sqrt((w.x2 - w.x1)**2 + (w.y2 - w.y1)**2)
 
-def wall_angle_deg(w: WallData) -> float:
-    dx = w.x2 - w.x1
-    dy = w.y2 - w.y1
-    return math.degrees(math.atan2(dy, dx))
-
 def wall_direction(w: WallData) -> Tuple[float, float]:
     dx = w.x2 - w.x1
     dy = w.y2 - w.y1
@@ -152,7 +141,7 @@ def new_guid() -> str:
 
 
 # ─────────────────────────────────────────────
-#  Construction du modèle IFC
+#  Construction du modèle IFC avec vides sémantiques
 # ─────────────────────────────────────────────
 
 def build_ifc(walls, doors, windows, bboxes, output_path: str):
@@ -228,13 +217,11 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
     )
     model.createIfcRelAggregates(new_guid(), owner, None, None, building, [storey])
 
-    elements = []  # tous les éléments IFC à contenir dans l'étage
-
-    # ── Dictionnaire wall_name → ifc_wall (pour parent des portes/fenêtres) ──
+    elements = []
     ifc_walls = {}
 
     # ─────────────────────────────────────────
-    #  DALLE DE SOL (convex hull des extrémités de murs)
+    #  DALLE DE SOL
     # ─────────────────────────────────────────
     if len(walls) >= 3:
         try:
@@ -253,7 +240,7 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
                 model.createIfcCartesianPoint((float(p[0]), float(p[1])))
                 for p in hull_pts
             ]
-            ifc_pts.append(ifc_pts[0])  # fermer le polygone
+            ifc_pts.append(ifc_pts[0])
             polyline = model.createIfcPolyline(ifc_pts)
             profile  = model.createIfcArbitraryClosedProfileDef("AREA", None, polyline)
 
@@ -302,7 +289,6 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
         thickness = w.thickness if w.thickness > 0.001 else 0.2
         angle_rad = math.atan2(w.y2 - w.y1, w.x2 - w.x1)
 
-        # Placement local : origine au point de départ, rotation selon la direction
         placement = model.createIfcLocalPlacement(
             storey_placement,
             model.createIfcAxis2Placement3D(
@@ -314,7 +300,6 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
             ),
         )
 
-        # Géométrie : extrusion rectangulaire
         profile = model.createIfcRectangleProfileDef(
             "AREA", None,
             model.createIfcAxis2Placement2D(
@@ -356,12 +341,19 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
         wall_thickness_map[w.name] = w.thickness if w.thickness > 0.001 else 0.2
 
     # ─────────────────────────────────────────
-    #  PORTES
+    #  PORTES avec vides sémantiques
     # ─────────────────────────────────────────
     for d in doors:
+        parent_wall = ifc_walls.get(d.parent_wall)
+        if not parent_wall:
+            print(f"  ⚠ {d.name}: mur parent {d.parent_wall} introuvable")
+            continue
+        
         dir_x, dir_y = wall_dir_map.get(d.parent_wall, (1.0, 0.0))
         wall_t = wall_thickness_map.get(d.parent_wall, 0.2)
-        placement = model.createIfcLocalPlacement(
+        
+        # ── Créer l'ouverture (IfcOpeningElement) ──
+        opening_placement = model.createIfcLocalPlacement(
             storey_placement,
             model.createIfcAxis2Placement3D(
                 model.createIfcCartesianPoint((d.cx, d.cy, d.cz - d.height / 2)),
@@ -369,15 +361,16 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
                 model.createIfcDirection((dir_x, dir_y, 0.0)),
             ),
         )
-        profile = model.createIfcRectangleProfileDef(
+        
+        opening_profile = model.createIfcRectangleProfileDef(
             "AREA", None,
             model.createIfcAxis2Placement2D(
                 model.createIfcCartesianPoint((0.0, 0.0)), None
             ),
-            d.width, wall_t,
+            d.width, wall_t + 0.02,  # légèrement plus épais pour garantir la coupe
         )
-        solid = model.createIfcExtrudedAreaSolid(
-            profile,
+        opening_solid = model.createIfcExtrudedAreaSolid(
+            opening_profile,
             model.createIfcAxis2Placement3D(
                 model.createIfcCartesianPoint((0.0, 0.0, 0.0)),
                 model.createIfcDirection((0.0, 0.0, 1.0)),
@@ -386,23 +379,81 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
             model.createIfcDirection((0.0, 0.0, 1.0)),
             d.height,
         )
-        shape = model.createIfcShapeRepresentation(body_ctx, "Body", "SweptSolid", [solid])
-        prod_repr = model.createIfcProductDefinitionShape(None, None, [shape])
-
+        opening_shape = model.createIfcShapeRepresentation(
+            body_ctx, "Body", "SweptSolid", [opening_solid]
+        )
+        opening_repr = model.createIfcProductDefinitionShape(None, None, [opening_shape])
+        
+        opening = model.createIfcOpeningElement(
+            new_guid(), owner, f"{d.name}_opening", f"Opening for {d.name}",
+            None, opening_placement, opening_repr, None,
+        )
+        
+        # ── Créer le vide dans le mur (IfcRelVoidsElement) ──
+        model.createIfcRelVoidsElement(
+            new_guid(), owner, None, None, parent_wall, opening
+        )
+        
+        # ── Créer la porte (IfcDoor) ──
+        door_placement = model.createIfcLocalPlacement(
+            storey_placement,
+            model.createIfcAxis2Placement3D(
+                model.createIfcCartesianPoint((d.cx, d.cy, d.cz - d.height / 2)),
+                model.createIfcDirection((0.0, 0.0, 1.0)),
+                model.createIfcDirection((dir_x, dir_y, 0.0)),
+            ),
+        )
+        
+        door_profile = model.createIfcRectangleProfileDef(
+            "AREA", None,
+            model.createIfcAxis2Placement2D(
+                model.createIfcCartesianPoint((0.0, 0.0)), None
+            ),
+            d.width, wall_t,
+        )
+        door_solid = model.createIfcExtrudedAreaSolid(
+            door_profile,
+            model.createIfcAxis2Placement3D(
+                model.createIfcCartesianPoint((0.0, 0.0, 0.0)),
+                model.createIfcDirection((0.0, 0.0, 1.0)),
+                model.createIfcDirection((1.0, 0.0, 0.0)),
+            ),
+            model.createIfcDirection((0.0, 0.0, 1.0)),
+            d.height,
+        )
+        door_shape = model.createIfcShapeRepresentation(
+            body_ctx, "Body", "SweptSolid", [door_solid]
+        )
+        door_repr = model.createIfcProductDefinitionShape(None, None, [door_shape])
+        
         ifc_door = model.createIfcDoor(
             new_guid(), owner, d.name, f"Door W={d.width:.2f}m H={d.height:.2f}m",
-            None, placement, prod_repr, None, d.height, d.width,
+            None, door_placement, door_repr, None, d.height, d.width,
         )
+        
+        # ── Lier la porte à l'ouverture (IfcRelFillsElement) ──
+        model.createIfcRelFillsElement(
+            new_guid(), owner, None, None, opening, ifc_door
+        )
+        
         elements.append(ifc_door)
-        print(f"  ✓ {d.name}: parent={d.parent_wall}, W={d.width:.2f}m, H={d.height:.2f}m")
+        print(f"  ✓ {d.name}: parent={d.parent_wall}, W={d.width:.2f}m, H={d.height:.2f}m "
+              f"(avec vide sémantique)")
 
     # ─────────────────────────────────────────
-    #  FENÊTRES
+    #  FENÊTRES avec vides sémantiques
     # ─────────────────────────────────────────
     for wn in windows:
+        parent_wall = ifc_walls.get(wn.parent_wall)
+        if not parent_wall:
+            print(f"  ⚠ {wn.name}: mur parent {wn.parent_wall} introuvable")
+            continue
+        
         dir_x, dir_y = wall_dir_map.get(wn.parent_wall, (1.0, 0.0))
         wall_t = wall_thickness_map.get(wn.parent_wall, 0.2)
-        placement = model.createIfcLocalPlacement(
+        
+        # ── Créer l'ouverture ──
+        opening_placement = model.createIfcLocalPlacement(
             storey_placement,
             model.createIfcAxis2Placement3D(
                 model.createIfcCartesianPoint((wn.cx, wn.cy, wn.cz - wn.height / 2)),
@@ -410,15 +461,16 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
                 model.createIfcDirection((dir_x, dir_y, 0.0)),
             ),
         )
-        profile = model.createIfcRectangleProfileDef(
+        
+        opening_profile = model.createIfcRectangleProfileDef(
             "AREA", None,
             model.createIfcAxis2Placement2D(
                 model.createIfcCartesianPoint((0.0, 0.0)), None
             ),
-            wn.width, wall_t,
+            wn.width, wall_t + 0.02,
         )
-        solid = model.createIfcExtrudedAreaSolid(
-            profile,
+        opening_solid = model.createIfcExtrudedAreaSolid(
+            opening_profile,
             model.createIfcAxis2Placement3D(
                 model.createIfcCartesianPoint((0.0, 0.0, 0.0)),
                 model.createIfcDirection((0.0, 0.0, 1.0)),
@@ -427,15 +479,66 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
             model.createIfcDirection((0.0, 0.0, 1.0)),
             wn.height,
         )
-        shape = model.createIfcShapeRepresentation(body_ctx, "Body", "SweptSolid", [solid])
-        prod_repr = model.createIfcProductDefinitionShape(None, None, [shape])
-
+        opening_shape = model.createIfcShapeRepresentation(
+            body_ctx, "Body", "SweptSolid", [opening_solid]
+        )
+        opening_repr = model.createIfcProductDefinitionShape(None, None, [opening_shape])
+        
+        opening = model.createIfcOpeningElement(
+            new_guid(), owner, f"{wn.name}_opening", f"Opening for {wn.name}",
+            None, opening_placement, opening_repr, None,
+        )
+        
+        # ── Créer le vide dans le mur ──
+        model.createIfcRelVoidsElement(
+            new_guid(), owner, None, None, parent_wall, opening
+        )
+        
+        # ── Créer la fenêtre ──
+        window_placement = model.createIfcLocalPlacement(
+            storey_placement,
+            model.createIfcAxis2Placement3D(
+                model.createIfcCartesianPoint((wn.cx, wn.cy, wn.cz - wn.height / 2)),
+                model.createIfcDirection((0.0, 0.0, 1.0)),
+                model.createIfcDirection((dir_x, dir_y, 0.0)),
+            ),
+        )
+        
+        window_profile = model.createIfcRectangleProfileDef(
+            "AREA", None,
+            model.createIfcAxis2Placement2D(
+                model.createIfcCartesianPoint((0.0, 0.0)), None
+            ),
+            wn.width, wall_t,
+        )
+        window_solid = model.createIfcExtrudedAreaSolid(
+            window_profile,
+            model.createIfcAxis2Placement3D(
+                model.createIfcCartesianPoint((0.0, 0.0, 0.0)),
+                model.createIfcDirection((0.0, 0.0, 1.0)),
+                model.createIfcDirection((1.0, 0.0, 0.0)),
+            ),
+            model.createIfcDirection((0.0, 0.0, 1.0)),
+            wn.height,
+        )
+        window_shape = model.createIfcShapeRepresentation(
+            body_ctx, "Body", "SweptSolid", [window_solid]
+        )
+        window_repr = model.createIfcProductDefinitionShape(None, None, [window_shape])
+        
         ifc_window = model.createIfcWindow(
             new_guid(), owner, wn.name, f"Window W={wn.width:.2f}m H={wn.height:.2f}m",
-            None, placement, prod_repr, None, wn.height, wn.width,
+            None, window_placement, window_repr, None, wn.height, wn.width,
         )
+        
+        # ── Lier la fenêtre à l'ouverture ──
+        model.createIfcRelFillsElement(
+            new_guid(), owner, None, None, opening, ifc_window
+        )
+        
         elements.append(ifc_window)
-        print(f"  ✓ {wn.name}: parent={wn.parent_wall}, W={wn.width:.2f}m, H={wn.height:.2f}m")
+        print(f"  ✓ {wn.name}: parent={wn.parent_wall}, W={wn.width:.2f}m, H={wn.height:.2f}m "
+              f"(avec vide sémantique)")
 
     # ─────────────────────────────────────────
     #  OBJETS (Bbox) → IfcFurnishingElement
@@ -490,6 +593,7 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
     print(f"\n✅ IFC sauvegardé : {output_path}")
     print(f"   Éléments : 1 dalle + {len(walls)} murs, {len(doors)} portes, "
           f"{len(windows)} fenêtres, {len(bboxes)} objets")
+    print(f"   Vides sémantiques créés : {len(doors) + len(windows)} IfcOpeningElement")
 
 
 # ─────────────────────────────────────────────
@@ -498,9 +602,9 @@ def build_ifc(walls, doors, windows, bboxes, output_path: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convertit la sortie TXT de SpatialLM en IFC"
+        description="Convertit la sortie TXT de SpatialLM en IFC avec vides sémantiques"
     )
-    parser.add_argument("--input",  "-i", required=True,
+    parser.add_argument("--input", "-i", required=True,
                         help="Fichier TXT de sortie SpatialLM")
     parser.add_argument("--output", "-o", default="output.ifc",
                         help="Fichier IFC de sortie (défaut: output.ifc)")
@@ -509,7 +613,7 @@ def main():
     print(f"\n── Parsing {args.input} ──")
     walls, doors, windows, bboxes = parse_spatiallm_txt(args.input)
 
-    print(f"\n── Construction du modèle IFC ──")
+    print(f"\n── Construction du modèle IFC avec vides sémantiques ──")
     build_ifc(walls, doors, windows, bboxes, args.output)
 
 

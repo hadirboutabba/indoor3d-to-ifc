@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="854.713701pt" height="208.414488pt" viewBox="0 0 854.713701 208.414488" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-09-07T12:27:24.172435</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.9, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 208.414488 
+L 854.713701 208.414488 
+L 854.713701 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 143.892283 104.207244 
+Q 152.39622 104.207244 159.67032 104.207244 
+" clip-path="url(#pc291482899)" style="fill: none; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 156.27032 102.507244 
+L 159.67032 104.207244 
+L 156.27032 105.907244 
+z
+" clip-path="url(#pc291482899)" style="fill: #1a1a1a; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 291.293858 104.207244 
+Q 299.797795 104.207244 307.071895 104.207244 
+" clip-path="url(#pc291482899)" style="fill: none; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 303.671895 102.507244 
+L 307.071895 104.207244 
+L 303.671895 105.907244 
+z
+" clip-path="url(#pc291482899)" style="fill: #1a1a1a; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 438.695433 104.207244 
+Q 447.19937 104.207244 454.47347 104.207244 
+" clip-path="url(#pc291482899)" style="fill: none; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 451.07347 102.507244 
+L 454.47347 104.207244 
+L 451.07347 105.907244 
+z
+" clip-path="url(#pc291482899)" style="fill: #1a1a1a; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 586.097008 104.207244 
+Q 594.600945 104.207244 601.875045 104.207244 
+" clip-path="url(#pc291482899)" style="fill: none; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+    <path d="M 598.475045 102.507244 
+L 601.875045 104.207244 
+L 598.475045 105.907244 
+z
+" clip-path="url(#pc291482899)" style="fill: #1a1a1a; stroke: #1a1a1a; stroke-width: 1.1; stroke-linecap: round"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 733.498583 104.207244 
+Q 747.671811 104.207244 760.167988 104.207244 
+" clip-path="url(#pc291482899)" style="fill: none; stroke: #2f4f6b; stroke-width: 1.5; stroke-linecap: round"/>
+    <path d="M 756.767988 102.507244 
+L 760.167988 104.207244 
+L 756.767988 105.907244 
+z
+" clip-path="url(#pc291482899)" style="fill: #2f4f6b; stroke: #2f4f6b; stroke-width: 1.5; stroke-linecap: round"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 17.467087 36.175748 
+L 139.92378 36.175748 
+Q 143.892283 36.175748 143.892283 40.144252 
+L 143.892283 168.270236 
+Q 143.892283 172.23874 139.92378 172.23874 
+L 17.467087 172.23874 
+Q 13.498583 172.23874 13.498583 168.270236 
+L 13.498583 40.144252 
+Q 13.498583 36.175748 17.467087 36.175748 
+z
+" clip-path="url(#pc291482899)" style="fill: #ffffff; stroke: #1a1a1a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 164.868661 36.175748 
+L 287.325354 36.175748 
+Q 291.293858 36.175748 291.293858 40.144252 
+L 291.293858 168.270236 
+Q 291.293858 172.23874 287.325354 172.23874 
+L 164.868661 172.23874 
+Q 160.900157 172.23874 160.900157 168.270236 
+L 160.900157 40.144252 
+Q 160.900157 36.175748 164.868661 36.175748 
+z
+" clip-path="url(#pc291482899)" style="fill: #ffffff; stroke: #1a1a1a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 312.270236 36.175748 
+L 434.726929 36.175748 
+Q 438.695433 36.175748 438.695433 40.144252 
+L 438.695433 168.270236 
+Q 438.695433 172.23874 434.726929 172.23874 
+L 312.270236 172.23874 
+Q 308.301732 172.23874 308.301732 168.270236 
+L 308.301732 40.144252 
+Q 308.301732 36.175748 312.270236 36.175748 
+z
+" clip-path="url(#pc291482899)" style="fill: #ffffff; stroke: #1a1a1a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 459.671811 36.175748 
+L 582.128504 36.175748 
+Q 586.097008 36.175748 586.097008 40.144252 
+L 586.097008 168.270236 
+Q 586.097008 172.23874 582.128504 172.23874 
+L 459.671811 172.23874 
+Q 455.703307 172.23874 455.703307 168.270236 
+L 455.703307 40.144252 
+Q 455.703307 36.175748 459.671811 36.175748 
+z
+" clip-path="url(#pc291482899)" style="fill: #ffffff; stroke: #1a1a1a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_11">
+    <path d="M 607.073386 36.175748 
+L 729.530079 36.175748 
+Q 733.498583 36.175748 733.498583 40.144252 
+L 733.498583 168.270236 
+Q 733.498583 172.23874 729.530079 172.23874 
+L 607.073386 172.23874 
+Q 603.104882 172.23874 603.104882 168.270236 
+L 603.104882 40.144252 
+Q 603.104882 36.175748 607.073386 36.175748 
+z
+" clip-path="url(#pc291482899)" style="fill: #ffffff; stroke: #1a1a1a; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_12">
+    <path d="M 765.813543 64.522205 
+L 837.246614 64.522205 
+Q 841.215118 64.522205 841.215118 68.490709 
+L 841.215118 139.92378 
+Q 841.215118 143.892283 837.246614 143.892283 
+L 765.813543 143.892283 
+Q 761.845039 143.892283 761.845039 139.92378 
+L 761.845039 68.490709 
+Q 761.845039 64.522205 765.813543 64.522205 
+z
+" clip-path="url(#pc291482899)" style="fill: #ffffff; stroke: #1a1a1a; stroke-width: 1.6; stroke-linejoin: miter"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 8.6px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #1a1a1a" x="22.569449" y="51.800348" transform="rotate(-0 22.569449 51.800348)">Nuage de points brut</text>
+   </g>
+   <g id="text_2">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: start; fill: #5c5c5c" x="22.569449" y="63.507513" transform="rotate(-0 22.569449 63.507513)">.ply</text>
+   </g>
+   <g id="text_3">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="22.569449" y="73.569023" transform="rotate(-0 22.569449 73.569023)">Scan 3D brut</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="22.569449" y="83.649658" transform="rotate(-0 22.569449 83.649658)">(LiDAR / photogrammetrie)</text>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 8.6px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #1a1a1a" x="169.971024" y="51.833942" transform="rotate(-0 169.971024 51.833942)">Pretraitement</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: start; fill: #5c5c5c" x="169.971024" y="63.388263" transform="rotate(-0 169.971024 63.388263)">preprocess_for_</text>
+   </g>
+   <g id="text_7">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: start; fill: #5c5c5c" x="169.971024" y="73.588148" transform="rotate(-0 169.971024 73.588148)">spatiallm.py</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="169.971024" y="83.649658" transform="rotate(-0 169.971024 83.649658)">Filtrage statistique + DBSCAN</text>
+   </g>
+   <g id="text_9">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="169.971024" y="93.730293" transform="rotate(-0 169.971024 93.730293)">+ normalisation de hauteur</text>
+   </g>
+   <g id="text_10">
+    <text style="font-weight: 700; font-size: 8.6px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #1a1a1a" x="317.372598" y="51.833942" transform="rotate(-0 317.372598 51.833942)">Inference SpatialLM</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: start; fill: #5c5c5c" x="317.372598" y="63.507513" transform="rotate(-0 317.372598 63.507513)">inference.py</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="317.372598" y="73.569023" transform="rotate(-0 317.372598 73.569023)">SpatialLM1.1</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="317.372598" y="83.649658" transform="rotate(-0 317.372598 83.649658)">(Llama-1B ou Qwen-0.5B)</text>
+   </g>
+   <g id="text_14">
+    <text style="font-weight: 700; font-size: 8.6px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #1a1a1a" x="464.774173" y="51.833942" transform="rotate(-0 464.774173 51.833942)">Post-traitement</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: start; fill: #5c5c5c" x="464.774173" y="63.507513" transform="rotate(-0 464.774173 63.507513)">postprocess.py</text>
+   </g>
+   <g id="text_16">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="464.774173" y="73.569023" transform="rotate(-0 464.774173 73.569023)">Fusion des murs colineaires</text>
+   </g>
+   <g id="text_17">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="464.774173" y="83.649658" transform="rotate(-0 464.774173 83.649658)">+ reajustement des bbox</text>
+   </g>
+   <g id="text_18">
+    <text style="font-weight: 700; font-size: 8.6px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #1a1a1a" x="612.175748" y="51.833942" transform="rotate(-0 612.175748 51.833942)">Generation IFC</text>
+   </g>
+   <g id="text_19">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: start; fill: #5c5c5c" x="612.175748" y="63.407388" transform="rotate(-0 612.175748 63.407388)">spatiallm_to_ifc.py</text>
+   </g>
+   <g id="text_20">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="612.175748" y="73.569023" transform="rotate(-0 612.175748 73.569023)">ifcopenshell : dalle, murs,</text>
+   </g>
+   <g id="text_21">
+    <text style="font-size: 7.2px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: start; fill: #5c5c5c" x="612.175748" y="83.649658" transform="rotate(-0 612.175748 83.649658)">ouvertures, mobilier</text>
+   </g>
+   <g id="text_22">
+    <text style="font-weight: 700; font-size: 8.6px; font-family: 'Arial', 'Helvetica', 'DejaVu Sans', sans-serif; text-anchor: middle; fill: #1a1a1a" x="801.530079" y="99.733875" transform="rotate(-0 801.530079 99.733875)">Modele IFC</text>
+   </g>
+   <g id="text_23">
+    <text style="font-size: 7.2px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: middle; fill: #5c5c5c" x="801.530079" y="111.407446" transform="rotate(-0 801.530079 111.407446)">.ifc</text>
+   </g>
+   <g id="text_24">
+    <text style="font-size: 7px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: middle; fill: #1a1a1a" x="152.39622" y="98.21603" transform="rotate(-0 152.39622 98.21603)">scan.ply</text>
+   </g>
+   <g id="text_25">
+    <text style="font-size: 7px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: middle; fill: #1a1a1a" x="299.797795" y="98.021342" transform="rotate(-0 299.797795 98.021342)">scan_clean.ply</text>
+   </g>
+   <g id="text_26">
+    <text style="font-size: 7px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: middle; fill: #1a1a1a" x="447.19937" y="98.021342" transform="rotate(-0 447.19937 98.021342)">raw_layout.txt</text>
+   </g>
+   <g id="text_27">
+    <text style="font-size: 7px; font-family: 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', 'Computer Modern Typewriter', 'Andale Mono', 'Nimbus Mono L', 'Courier New', 'Courier', 'Fixed', 'Terminal', monospace; text-anchor: middle; fill: #1a1a1a" x="594.600945" y="98.021342" transform="rotate(-0 594.600945 98.021342)">refined_layout.txt</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pc291482899">
+   <rect x="2.16" y="2.16" width="850.393701" height="204.094488"/>
+  </clipPath>
+ </defs>
+</svg>
